@@ -83,6 +83,8 @@ public final class SettingsTab extends Tab {
         g = Ui.group(c, "Connexion", c1);
         check(g, "Se reconnecter à la dernière IP au démarrage", "auto_reconnect", true);
         check(g, "Ouvrir le shell dans la console dès la connexion", "auto_shell", false);
+        check(g, "Détecter : analyser aussi 192.168.0.x, 192.168.1.x et 192.168.2.x", "scan_common_nets", true);
+        field(g, "Réseaux en plus :", "scan_extra_nets", "", false).setHint("ex. 10.0.0.x, 192.168.50.0/24");
 
         g = Ui.group(c, "scrcpy", c2);
         field(g, "Débit vidéo :", "scrcpy_bitrate", "8M", false);

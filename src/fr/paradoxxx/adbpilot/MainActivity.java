@@ -58,7 +58,7 @@ import java.util.Map;
 import static fr.paradoxxx.adbpilot.ui.Ui.dp;
 
 public final class MainActivity extends Activity implements Controller.Ui {
-    public static final String VERSION = "0.1.1-test";
+    public static final String VERSION = "0.2.0";
     private static final String ACTION_USB_PERMISSION = "fr.paradoxxx.adbpilot.USB_PERMISSION";
     private static final int REQ_FILES = 41, REQ_PUSH = 42;
 

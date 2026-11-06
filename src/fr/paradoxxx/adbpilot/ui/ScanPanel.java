@@ -107,11 +107,14 @@ public final class ScanPanel extends LinearLayout {
         running = true;
         stop = false;
         again.setEnabled(false);
-        List<String> n = NetScan.localNetworks();
+        List<String> hist = new ArrayList<String>(Config.getList("ip_history"));
+        hist.addAll(Config.getMap("ip_names").keySet());
+        final List<String> n = NetScan.scanNetworks(Config.getBool("scan_common_nets", true), Config.getStr("scan_extra_nets", ""), hist);
         StringBuilder sb = new StringBuilder();
         for (String s : n) sb.append(sb.length() > 0 ? ", " : "").append(s).append("0/24");
         nets = sb.length() == 0 ? "?" : sb.toString();
         sub.setText("Analyse de " + nets + "…");
+        ctl.log(">> Détection : analyse de " + nets, "cmd");
         bar.setIndeterminate(true);
         bar.setVisibility(VISIBLE);
         fill(new ArrayList<NetScan.Found>(), false);
@@ -148,7 +151,7 @@ public final class ScanPanel extends LinearLayout {
                     public boolean stopped() {
                         return stop;
                     }
-                });
+                }, n);
                 if (lock != null) try {
                     lock.release();
                 } catch (Exception ignored) {
@@ -164,6 +167,9 @@ public final class ScanPanel extends LinearLayout {
                         sub.setText(nets + " · analysé en " + Math.round((System.currentTimeMillis() - t0) / 1000.0) + " s · "
                                 + nadb + " appareil(s) avec ADB, " + res.size() + " au total");
                         fill(res, false);
+                        for (NetScan.Found f : res)
+                            ctl.log(fr.paradoxxx.adbpilot.Html.esc(f.ip + ":" + (f.port > 0 ? f.port : "-") + "  " + (f.adb.isEmpty() ? "-" : f.adb) + "  " + f.name), "out");
+                        ctl.log("Détection terminée : " + nadb + " appareil(s) avec ADB, " + res.size() + " au total", nadb > 0 ? "ok" : "info");
                     }
                 });
             }

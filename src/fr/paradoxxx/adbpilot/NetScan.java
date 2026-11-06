@@ -51,22 +51,85 @@ public final class NetScan {
     static final String[] MDNS = {"_adb-tls-connect._tcp.local", "_adb._tcp.local", "_googlecast._tcp.local",
             "_androidtvremote2._tcp.local"};
 
-    /** Préfixes /24 des interfaces de la tablette (ex. "192.168.1."). */
+    /** Préfixes /24 du Wi-Fi / Ethernet de la tablette (ex. "192.168.1."), sans données mobiles ni VPN. */
     public static List<String> localNetworks() {
-        List<String> out = new ArrayList<String>();
+        List<String> main = new ArrayList<String>(), other = new ArrayList<String>();
         try {
             for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces())) {
                 if (!ni.isUp() || ni.isLoopback()) continue;
+                String name = ni.getName() == null ? "" : ni.getName().toLowerCase();
+                if (name.startsWith("rmnet") || name.startsWith("ccmni") || name.startsWith("tun") || name.startsWith("ppp")
+                        || name.startsWith("dummy") || name.startsWith("v4-")) continue;
+                boolean pref = name.startsWith("wlan") || name.startsWith("eth") || name.startsWith("ap") || name.startsWith("swlan");
                 for (InterfaceAddress ia : ni.getInterfaceAddresses()) {
                     InetAddress a = ia.getAddress();
                     if (!(a instanceof Inet4Address) || !a.isSiteLocalAddress()) continue;
                     String ip = a.getHostAddress();
                     String pre = ip.substring(0, ip.lastIndexOf('.') + 1);
-                    if (!out.contains(pre)) out.add(pre);
+                    List<String> l = pref ? main : other;
+                    if (!l.contains(pre)) l.add(pre);
                 }
             }
         } catch (Exception ignored) {
         }
+        return main.isEmpty() ? other : main;
+    }
+
+    static final String[] COMMON = {"192.168.0.", "192.168.1.", "192.168.2."};
+
+    /** « 192.168.1.0/24, 10.0.0.x 172.16.5 192.168.4.0/22 » -> préfixes /24. */
+    public static List<String> parseNetworks(String text) {
+        List<String> out = new ArrayList<String>();
+        if (text == null) return out;
+        for (String tok : text.trim().split("[\\s,;]+")) {
+            tok = tok.trim().toLowerCase().replace(".x", ".0").replace(".*", ".0");
+            if (tok.isEmpty()) continue;
+            int len = 24;
+            int sl = tok.indexOf('/');
+            if (sl > 0) {
+                try {
+                    len = Integer.parseInt(tok.substring(sl + 1));
+                } catch (NumberFormatException e) {
+                    continue;
+                }
+                tok = tok.substring(0, sl);
+            }
+            String[] p = tok.split("\\.");
+            if (p.length == 3) p = new String[]{p[0], p[1], p[2], "0"};
+            if (p.length != 4) continue;
+            int[] o = new int[4];
+            boolean ok = true;
+            for (int k = 0; k < 4; k++) {
+                try {
+                    o[k] = Integer.parseInt(p[k]);
+                } catch (NumberFormatException e) {
+                    ok = false;
+                }
+                if (o[k] < 0 || o[k] > 255) ok = false;
+            }
+            if (!ok) continue;
+            len = Math.max(22, Math.min(24, len));
+            int count = 1 << (24 - len);
+            int base = o[2] & ~(count - 1);
+            for (int k = 0; k < count; k++) {
+                String pre = o[0] + "." + o[1] + "." + (base + k) + ".";
+                if (!out.contains(pre)) out.add(pre);
+            }
+        }
+        return out;
+    }
+
+    /** Réseaux à analyser : celui de la tablette, puis 192.168.0/1/2.x, l'historique et les réseaux en plus. */
+    public static List<String> scanNetworks(boolean common, String extra, List<String> history) {
+        List<String> out = new ArrayList<String>(localNetworks());
+        List<String> cands = new ArrayList<String>();
+        if (common) for (String c : COMMON) cands.add(c);
+        for (String h : history) {
+            String ip = h.split(":")[0];
+            if (ip.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")) cands.add(ip.substring(0, ip.lastIndexOf('.') + 1));
+        }
+        cands.addAll(parseNetworks(extra));
+        for (String c : cands) if (!out.contains(c)) out.add(c);
         return out;
     }
 
@@ -291,8 +354,8 @@ public final class NetScan {
     }
 
     // ------------------------------------------------------------------ scan
-    public static List<Found> scan(int port, final Map<String, String> known, final Progress pg) {
-        List<String> nets = localNetworks();
+    public static List<Found> scan(int port, final Map<String, String> known, final Progress pg, List<String> nets) {
+        if (nets == null) nets = localNetworks();
         final List<String> hosts = new ArrayList<String>();
         for (String n : nets) for (int i = 1; i < 255; i++) hosts.add(n + i);
         final int[] ports = port == 5555 ? new int[]{5555} : new int[]{port, 5555};
