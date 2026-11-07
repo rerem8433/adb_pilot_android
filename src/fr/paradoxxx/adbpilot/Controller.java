@@ -326,6 +326,8 @@ public final class Controller {
                     removeDevice(d);
                 }
                 if (!quiet) log(">> adb connect " + Html.esc(target), "cmd");
+                // Connexion par le Wi-Fi / Ethernet, jamais par les données mobiles
+                NetScan.bindToLan(Config.ctx);
                 String host = target.substring(0, target.lastIndexOf(':'));
                 int p = Integer.parseInt(target.substring(target.lastIndexOf(':') + 1));
                 final Dev dev = new Dev();

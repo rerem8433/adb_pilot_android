@@ -58,7 +58,7 @@ import java.util.Map;
 import static fr.paradoxxx.adbpilot.ui.Ui.dp;
 
 public final class MainActivity extends Activity implements Controller.Ui {
-    public static final String VERSION = "0.2.0";
+    public static final String VERSION = "0.2.1";
     private static final String ACTION_USB_PERMISSION = "fr.paradoxxx.adbpilot.USB_PERMISSION";
     private static final int REQ_FILES = 41, REQ_PUSH = 42;
 
@@ -430,7 +430,8 @@ public final class MainActivity extends Activity implements Controller.Ui {
                 ctl.connectIp(target, false);
             }
         });
-        FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(dp(780), Ui.WRAP, Gravity.TOP | Gravity.END);
+        int sw = getResources().getDisplayMetrics().widthPixels;
+        FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(Math.min(dp(780), sw - dp(16)), Ui.WRAP, Gravity.TOP | Gravity.END);
         sp.topMargin = dp(46);
         sp.rightMargin = dp(8);
         root.addView(scan, sp);

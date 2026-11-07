@@ -107,6 +107,15 @@ public final class ScanPanel extends LinearLayout {
         running = true;
         stop = false;
         again.setEnabled(false);
+        if (!NetScan.bindToLan(getContext())) {
+            running = false;
+            again.setEnabled(true);
+            sub.setText("Pas de réseau Wi-Fi ou Ethernet : connecte la tablette au même réseau que les appareils.");
+            fill(new ArrayList<NetScan.Found>(), false);
+            empty.setText("Le scan n'est pas lancé sur les données mobiles (il analyserait le réseau de l'opérateur, pas ta maison).");
+            empty.setVisibility(VISIBLE);
+            return;
+        }
         List<String> hist = new ArrayList<String>(Config.getList("ip_history"));
         hist.addAll(Config.getMap("ip_names").keySet());
         final List<String> n = NetScan.scanNetworks(Config.getBool("scan_common_nets", true), Config.getStr("scan_extra_nets", ""), hist);
@@ -196,6 +205,9 @@ public final class ScanPanel extends LinearLayout {
             } else if ("tls".equals(f.adb)) {
                 lab = "Débogage sans fil (Android 11+)";
                 col = Ui.ORANGE;
+            } else if ("port".equals(f.adb)) {
+                lab = "Port ouvert · pas de réponse ADB";
+                col = 0xff77777b;
             } else {
                 lab = "ADB fermé";
                 col = 0xff77777b;

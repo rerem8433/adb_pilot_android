@@ -37,8 +37,9 @@ public final class NetScan {
         public final List<String> details = new ArrayList<String>();
         public final Set<String> sources = new LinkedHashSet<String>();
 
+        /** Vrai appareil ADB : il a répondu au protocole ADB (un port ouvert seul ne suffit pas). */
         public boolean connectable() {
-            return port > 0;
+            return port > 0 && ("open".equals(adb) || "auth".equals(adb) || "tls".equals(adb));
         }
     }
 
@@ -133,8 +134,44 @@ public final class NetScan {
         return out;
     }
 
+    /**
+     * Sockets liés au réseau Wi-Fi / Ethernet : sans ça, Android envoie les adresses hors du réseau local
+     * (192.168.0/1/2.x…) par les données mobiles, vers le réseau de l'opérateur.
+     */
+    public static volatile javax.net.SocketFactory factory;
+
+    /** Lie les connexions au Wi-Fi / Ethernet. false si la tablette n'a que les données mobiles. */
+    public static boolean bindToLan(android.content.Context ctx) {
+        try {
+            android.net.ConnectivityManager cm = (android.net.ConnectivityManager) ctx.getSystemService(android.content.Context.CONNECTIVITY_SERVICE);
+            android.net.Network wifi = null, eth = null;
+            for (android.net.Network nw : cm.getAllNetworks()) {
+                android.net.NetworkCapabilities nc = cm.getNetworkCapabilities(nw);
+                if (nc == null) continue;
+                if (nc.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) && wifi == null) wifi = nw;
+                if (nc.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET)) eth = nw;
+            }
+            android.net.Network n = wifi != null ? wifi : eth;
+            factory = n == null ? null : n.getSocketFactory();
+            return n != null;
+        } catch (Exception e) {
+            factory = null;
+            return true;
+        }
+    }
+
+    public static Socket newSocket() throws java.io.IOException {
+        javax.net.SocketFactory f = factory;
+        return f != null ? f.createSocket() : new Socket();
+    }
+
     static boolean portOpen(String ip, int port, int timeout) {
-        Socket s = new Socket();
+        Socket s;
+        try {
+            s = newSocket();
+        } catch (java.io.IOException e) {
+            return false;
+        }
         try {
             s.connect(new InetSocketAddress(ip, port), timeout);
             return true;
@@ -150,7 +187,12 @@ public final class NetScan {
 
     /** ("open", props) / ("auth", {}) / ("", {}) — aucune clé n'est envoyée. */
     static String banner(String ip, int port, Map<String, String> props) {
-        Socket s = new Socket();
+        Socket s;
+        try {
+            s = newSocket();
+        } catch (java.io.IOException e) {
+            return "";
+        }
         try {
             s.connect(new InetSocketAddress(ip, port), 1500);
             s.setSoTimeout(1500);
@@ -438,7 +480,9 @@ public final class NetScan {
                 public void run() {
                     if (f.port > 0 && f.adb.equals("auth")) {
                         Map<String, String> props = new HashMap<String, String>();
-                        if ("open".equals(banner(f.ip, f.port, props))) {
+                        String st = banner(f.ip, f.port, props);
+                        if ("".equals(st)) f.adb = "port";  // port ouvert, mais pas ADB
+                        if ("open".equals(st)) {
                             f.adb = "open";
                             String model = props.containsKey("ro.product.model") ? props.get("ro.product.model")
                                     : (props.containsKey("ro.product.name") ? props.get("ro.product.name") : "");
@@ -483,7 +527,7 @@ public final class NetScan {
     }
 
     static int order(String s) {
-        return "open".equals(s) ? 0 : "auth".equals(s) ? 1 : "tls".equals(s) ? 2 : 3;
+        return "open".equals(s) ? 0 : "auth".equals(s) ? 1 : "tls".equals(s) ? 2 : "port".equals(s) ? 3 : 4;
     }
 
     public static long ipKey(String ip) {

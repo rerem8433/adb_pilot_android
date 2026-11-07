@@ -33,7 +33,7 @@ public abstract class Transport {
         private final OutputStream out;
 
         public Tcp(String host, int port, int timeoutMs) throws IOException {
-            s = new Socket();
+            s = fr.paradoxxx.adbpilot.NetScan.newSocket();
             s.setTcpNoDelay(true);
             s.setKeepAlive(true);
             s.connect(new InetSocketAddress(host, port), timeoutMs);
