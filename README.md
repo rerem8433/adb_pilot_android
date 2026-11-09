@@ -66,23 +66,15 @@ Cette version n'est **pas un portage** de l'application PC : elle est **réécri
 
 **Applications** : liste avec noms, icônes, versions et tailles, panneau d'actions et assistant debloat.
 
-![Onglet Applications](screenshots/Applications.png)
-
-**Assistant debloat** : choix du niveau de nettoyage.
-
-![Assistant debloat](screenshots/Debloat.png)
-
-**Installer** : bibliothèque d'APK et état sur l'appareil.
-
-![Page Installer](screenshots/Installer.png)
+![Onglet Applications](screenshots/Applications.jpeg)
 
 **Store** : installation en un clic.
 
-![Onglet Store](screenshots/Store.png)
+![Onglet Store](screenshots/Store.jpeg)
 
 **Outils** : fiche de l'appareil, télécommande et scrcpy.
 
-![Onglet Outils](screenshots/Outils.png)
+![Onglet Outils](screenshots/Tools.jpeg)
 
 **scrcpy** : l'écran de la box sur la tablette.
 
@@ -90,11 +82,11 @@ Cette version n'est **pas un portage** de l'application PC : elle est **réécri
 
 **Processus** : applications en cours et RAM.
 
-![Onglet Processus](screenshots/Processus.png)
+![Onglet Processus](screenshots/Processus.jpeg)
 
 **Console** : adb / fastboot, shell, logcat.
 
-![Onglet Console](screenshots/Console.png)
+![Onglet Console](screenshots/Console.jpeg)
 
 ## Compatibilité
 
