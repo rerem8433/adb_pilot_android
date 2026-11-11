@@ -88,11 +88,21 @@ public final class ProcessTab extends Tab {
             }
         });
         tp.addView(cbAuto);
-        tp.addView(Ui.stretch(c));
-        lbl = Ui.text(c, "", 10, Ui.TEXT);
-        tp.addView(lbl);
-        lay.addView(tp);
-        cols = new Table.Cols("cols_procs", new String[]{"Application", "Processus", "RAM"}, new int[]{360, 320, 110},
+        lbl = Ui.text(c, "", Ui.phone ? 9 : 10, Ui.TEXT);
+        if (Ui.phone) {
+            cbAuto.setPadding(dp(6), dp(4), dp(4), dp(4));
+            lay.addView(Ui.hscroll(c, tp), Ui.lp(Ui.MATCH, Ui.WRAP));
+            lbl.setPadding(dp(2), dp(2), 0, dp(4));
+            lay.addView(lbl);
+        } else {
+            tp.addView(Ui.stretch(c));
+            tp.addView(lbl);
+            lay.addView(tp);
+        }
+        cols = Ui.phone
+                ? new Table.Cols("cols_procs_phone", new String[]{"Application", "Processus", "RAM"}, new int[]{150, 120, 72},
+                new boolean[]{false, false, false}, new int[]{Gravity.START, Gravity.START, Gravity.END}).fill(0)
+                : new Table.Cols("cols_procs", new String[]{"Application", "Processus", "RAM"}, new int[]{360, 320, 110},
                 new boolean[]{false, false, false}, new int[]{Gravity.START, Gravity.START, Gravity.END});
         cols.sortCol = 2;
         cols.sortAsc = false;
@@ -115,7 +125,8 @@ public final class ProcessTab extends Tab {
         lay.addView(list, Ui.lpw(Ui.MATCH, 0, 1));
         LinearLayout bot = Ui.row(c);
         bot.setPadding(0, dp(6), 0, 0);
-        String[] names = {"Rafraîchir", "Forcer l'arrêt", "Libérer la mémoire (tout)"};
+        String[] names = Ui.phone ? new String[]{"Rafraîchir", "Forcer l'arrêt", "Libérer la RAM"}
+                : new String[]{"Rafraîchir", "Forcer l'arrêt", "Libérer la mémoire (tout)"};
         for (int i = 0; i < names.length; i++) {
             final int k = i;
             Ui.Btn b = Ui.button(c, names[i], "btn");
@@ -126,8 +137,9 @@ public final class ProcessTab extends Tab {
                     else run("Libération de la mémoire", java.util.Arrays.asList("am kill-all"));
                 }
             });
-            LinearLayout.LayoutParams lp = Ui.lp(Ui.WRAP, dp(38));
-            lp.rightMargin = dp(6);
+            LinearLayout.LayoutParams lp = Ui.phone ? Ui.lpw(0, dp(40), 1) : Ui.lp(Ui.WRAP, dp(38));
+            lp.rightMargin = i < names.length - 1 || !Ui.phone ? dp(6) : 0;
+            if (Ui.phone) b.setPadding(dp(4), 0, dp(4), 0);
             bot.addView(b, lp);
         }
         lay.addView(bot);

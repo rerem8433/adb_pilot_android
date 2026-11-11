@@ -59,6 +59,9 @@ public final class Core {
             info.put(e.getKey(), v == null ? "" : v);
         }
         if (info.get("serial").isEmpty()) info.put("serial", d.serial);
+        // Nom donné à l'appareil (Paramètres → À propos / Préférences de l'appareil → Nom)
+        String n = d.shell("settings get global device_name", 10).out.trim();
+        info.put("device_name", n.isEmpty() || n.equalsIgnoreCase("null") || n.contains("\n") || n.length() > 64 ? "" : n);
         return info;
     }
 

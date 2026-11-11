@@ -32,6 +32,25 @@ public final class Table {
         public final int[] gravity;
         public int sortCol = -1;
         public boolean sortAsc = true;
+        /** Colonne qui prend la place restante (par défaut la dernière). */
+        public int fill = -1;
+
+        public Cols fill(int i) {
+            fill = i;
+            return this;
+        }
+
+        int fillIdx() {
+            return fill < 0 ? px.length - 1 : fill;
+        }
+
+        /** Largeur de la colonne i pour une largeur totale donnée. */
+        float width(int i, float total) {
+            if (i != fillIdx()) return px[i];
+            float w = total;
+            for (int k = 0; k < px.length; k++) if (k != i) w -= px[k];
+            return Math.max(dp(40), w);
+        }
 
         public Cols(String key, String[] titles, int[] widthsDp, boolean[] fixed, int[] gravity) {
             this.key = key;
@@ -56,7 +75,7 @@ public final class Table {
         void save() {
             if (key == null) return;
             Map<String, String> m = new HashMap<String, String>();
-            for (int i = 0; i < px.length - 1; i++) m.put(String.valueOf(i), String.valueOf(px[i]));
+            for (int i = 0; i < px.length; i++) if (i != fillIdx()) m.put(String.valueOf(i), String.valueOf(px[i]));
             Config.setMap(key, m);
         }
 
@@ -67,7 +86,7 @@ public final class Table {
                 View v = row.getChildAt(i);
                 LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) v.getLayoutParams();
                 if (lp == null) lp = new LinearLayout.LayoutParams(0, Ui.MATCH);
-                if (i == px.length - 1) {
+                if (i == fillIdx()) {
                     lp.width = 0;
                     lp.weight = 1;
                 } else {
@@ -91,7 +110,7 @@ public final class Table {
         private final HeaderListener l;
         private final TextPaint tp = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private int dragCol = -1;
+        private int dragCol = -1, dragSign = 1;
         private float downX, startW;
         private boolean moved;
         public int leftPad = 0;
@@ -109,9 +128,13 @@ public final class Table {
             setMeasuredDimension(MeasureSpec.getSize(w), dp(28));
         }
 
+        private float cw(int i) {
+            return cols.width(i, getWidth() - leftPad);
+        }
+
         private float colX(int i) {
             float x = leftPad;
-            for (int k = 0; k < i; k++) x += cols.px[k];
+            for (int k = 0; k < i; k++) x += cw(k);
             return x;
         }
 
@@ -120,7 +143,7 @@ public final class Table {
             int h = getHeight();
             float x = leftPad;
             for (int i = 0; i < cols.titles.length; i++) {
-                float w = i == cols.titles.length - 1 ? getWidth() - x : cols.px[i];
+                float w = cw(i);
                 tp.setColor(Ui.MUTED);
                 String t = TextUtils.ellipsize(cols.titles[i], tp, Math.max(0, w - dp(18)), TextUtils.TruncateAt.END).toString();
                 float tw = tp.measureText(t);
@@ -162,9 +185,16 @@ public final class Table {
                     dragCol = -1;
                     for (int i = 0; i < cols.titles.length - 1; i++) {
                         float edge = colX(i + 1);
-                        if (Math.abs(x - edge) < dp(14) && !cols.fixed[i]) {
+                        if (Math.abs(x - edge) >= dp(14)) continue;
+                        if (i != cols.fillIdx() && !cols.fixed[i]) {
                             dragCol = i;
-                            startW = cols.px[i];
+                            dragSign = 1;
+                        } else if (i == cols.fillIdx() && i + 1 < cols.titles.length && !cols.fixed[i + 1]) {
+                            dragCol = i + 1;  // bord droit de la colonne extensible : on règle sa voisine
+                            dragSign = -1;
+                        }
+                        if (dragCol >= 0) {
+                            startW = cols.px[dragCol];
                             break;
                         }
                     }
@@ -173,7 +203,7 @@ public final class Table {
                 case MotionEvent.ACTION_MOVE:
                     if (Math.abs(x - downX) > ViewConfiguration.get(getContext()).getScaledTouchSlop()) moved = true;
                     if (dragCol >= 0 && moved) {
-                        cols.px[dragCol] = (int) Math.max(dp(36), startW + (x - downX));
+                        cols.px[dragCol] = (int) Math.max(dp(36), startW + dragSign * (x - downX));
                         invalidate();
                         l.onResized();
                     }
@@ -184,7 +214,7 @@ public final class Table {
                     } else if (!moved) {
                         float cx = leftPad;
                         for (int i = 0; i < cols.titles.length; i++) {
-                            float w = i == cols.titles.length - 1 ? getWidth() - cx : cols.px[i];
+                            float w = cw(i);
                             if (x >= cx && x < cx + w) {
                                 if (cols.sortCol == i) cols.sortAsc = !cols.sortAsc;
                                 else {

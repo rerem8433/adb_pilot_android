@@ -4,6 +4,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInstaller;
+import android.net.Uri;
 import android.os.Build;
 
 import org.json.JSONArray;
@@ -45,21 +46,34 @@ public final class Updater {
         return false;
     }
 
+    /** Dernière release vue lors de la dernière vérification (pour le message « à jour »). */
+    public static volatile String lastSeen = "";
+
     /** Release plus récente que la version installée, sinon null. */
     public static Release check() throws Exception {
         HttpURLConnection c = (HttpURLConnection) new URL(API).openConnection();
         c.setConnectTimeout(15000);
         c.setReadTimeout(15000);
+        c.setUseCaches(false);
         c.setRequestProperty("User-Agent", "ADBPilot-Android/" + MainActivity.VERSION);
         c.setRequestProperty("Accept", "application/vnd.github+json");
+        c.setRequestProperty("Cache-Control", "no-cache");
         int code = c.getResponseCode();
         if (code == 404) {
             c.disconnect();
             return null;  // dépôt sans release publiée
         }
+        if (code != 200) {
+            // 403/429 : limite de l'API GitHub (60 requêtes/heure par adresse IP) -> page des releases
+            c.disconnect();
+            Release r = fromWebPage();
+            if (r != null || code < 400) return r;
+            throw new Exception("GitHub a répondu " + code + (code == 403 || code == 429 ? " (limite de requêtes atteinte, réessaie plus tard)" : ""));
+        }
         JSONObject d = new JSONObject(new String(Core.readAll(c.getInputStream()), "UTF-8"));
         c.disconnect();
         String tag = d.optString("tag_name", "");
+        lastSeen = tag;
         if (d.optBoolean("draft") || d.optBoolean("prerelease") || !isNewer(tag, MainActivity.VERSION)) return null;
         Release r = new Release();
         r.tag = tag;
@@ -78,6 +92,37 @@ public final class Updater {
             }
         }
         return r;
+    }
+
+    /**
+     * Secours sans l'API : github.com/…/releases/latest redirige vers …/tag/vX.Y.Z ;
+     * l'APK suit le nommage habituel ADB-Pilot-X.Y.Z-android.apk.
+     */
+    static Release fromWebPage() {
+        try {
+            HttpURLConnection c = (HttpURLConnection) new URL(RELEASES + "/latest").openConnection();
+            c.setInstanceFollowRedirects(false);
+            c.setConnectTimeout(15000);
+            c.setReadTimeout(15000);
+            c.setRequestProperty("User-Agent", "ADBPilot-Android/" + MainActivity.VERSION);
+            String loc = c.getHeaderField("Location");
+            c.disconnect();
+            if (loc == null || !loc.contains("/tag/")) return null;
+            String tag = Uri.decode(loc.substring(loc.lastIndexOf("/tag/") + 5));
+            lastSeen = tag;
+            if (!isNewer(tag, MainActivity.VERSION)) return null;
+            Release r = new Release();
+            r.tag = tag;
+            r.version = tag.replaceFirst("^[vV]", "");
+            r.notes = "";
+            r.url = RELEASES + "/tag/" + tag;
+            r.assetName = "ADB-Pilot-" + r.version + "-android.apk";
+            r.assetUrl = RELEASES + "/download/" + tag + "/" + r.assetName;
+            r.assetSize = 0;
+            return r;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public interface Prog {

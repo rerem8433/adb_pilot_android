@@ -77,13 +77,14 @@ public final class InstallerPage extends Tab {
     public InstallerPage(MainActivity m, AppsTab apps) {
         super(m);
         this.apps = apps;
-        LinearLayout lay = Ui.row(c);
+        final boolean ph = Ui.phone;
+        LinearLayout lay = ph ? Ui.col(c) : Ui.row(c);
         lay.setGravity(Gravity.TOP);
         view = lay;
         LinearLayout left = Ui.col(c);
         LinearLayout top = Ui.row(c);
         top.setPadding(dp(6), dp(4), dp(6), 0);
-        cbAll = new Widgets.Check(c, "Tout sélectionner").onChange(new Widgets.OnChange() {
+        cbAll = new Widgets.Check(c, ph ? "Tout" : "Tout sélectionner").onChange(new Widgets.OnChange() {
             public void changed(boolean on) {
                 for (Info f : shown) {
                     if (on) checked.add(f.path.getPath());
@@ -97,15 +98,21 @@ public final class InstallerPage extends Tab {
         tot.addView(Ui.text(c, "Total :", 7, Ui.MUTED));
         lblTotal = Ui.text(c, "0", 10, Ui.TEXT);
         tot.addView(lblTotal);
-        tot.setPadding(dp(16), 0, dp(20), 0);
+        tot.setPadding(dp(ph ? 10 : 16), 0, dp(ph ? 8 : 20), 0);
         top.addView(tot);
-        lblHint = Ui.single(Ui.html(c, "", 9, Ui.TEXT));
+        lblHint = Ui.single(Ui.html(c, "", ph ? 8 : 9, Ui.TEXT));
+        if (ph) lblHint.setEllipsize(android.text.TextUtils.TruncateAt.START);
         top.addView(lblHint, Ui.lpw(0, Ui.WRAP, 1));
         left.addView(top);
-        cols = new Table.Cols("cols_install", new String[]{"", "Application", "Fichier", "Paquet", "Version", "Sur l'appareil", "Taille"},
-                new int[]{34, 220, 160, 190, 100, 150, 85}, new boolean[]{true, false, false, false, false, false, false},
-                new int[]{Gravity.CENTER, Gravity.START, Gravity.START, Gravity.START, Gravity.START, Gravity.START, Gravity.END});
-        cols.sortCol = C_NAME;
+        if (ph) {
+            cols = new Table.Cols("cols_install_phone", new String[]{"", "Application", "Sur l'appareil"}, new int[]{34, 200, 104},
+                    new boolean[]{true, false, false}, new int[]{Gravity.CENTER, Gravity.START, Gravity.START}).fill(1);
+        } else {
+            cols = new Table.Cols("cols_install", new String[]{"", "Application", "Fichier", "Paquet", "Version", "Sur l'appareil", "Taille"},
+                    new int[]{34, 220, 160, 190, 100, 150, 85}, new boolean[]{true, false, false, false, false, false, false},
+                    new int[]{Gravity.CENTER, Gravity.START, Gravity.START, Gravity.START, Gravity.START, Gravity.START, Gravity.END});
+        }
+        cols.sortCol = 1;
         left.addView(new Table.Header(c, cols, new Table.HeaderListener() {
             public void onSort(int col) {
                 fill();
@@ -115,7 +122,7 @@ public final class InstallerPage extends Tab {
                 adapter.notifyDataSetChanged();
             }
         }), Ui.lp(Ui.MATCH, Ui.WRAP));
-        list = new Table.List(c, 10, 40, 48);
+        list = ph ? new Table.List(c, 9, 54, 40) : new Table.List(c, 10, 40, 48);
         list.setAdapter(adapter);
         list.onRowSize = new Runnable() {
             public void run() {
@@ -123,19 +130,16 @@ public final class InstallerPage extends Tab {
             }
         };
         left.addView(list, Ui.lpw(Ui.MATCH, 0, 1));
-        lay.addView(left, Ui.lpw(0, Ui.MATCH, 1));
+        lay.addView(left, ph ? Ui.lpw(Ui.MATCH, 0, 1) : Ui.lpw(0, Ui.MATCH, 1));
 
-        LinearLayout right = Ui.col(c);
-        right.setPadding(dp(6), dp(6), dp(6), dp(6));
-        Ui.Btn back = Ui.button(c, "  ←  Retour aux applications", "btn");
-        back.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+        // --- boutons
+        Ui.Btn back = Ui.button(c, ph ? "←  Retour" : "  ←  Retour aux applications", "btn");
+        back.setGravity(Gravity.CENTER_VERTICAL | (ph ? Gravity.CENTER_HORIZONTAL : Gravity.START));
         back.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 InstallerPage.this.apps.showApps();
             }
         });
-        right.addView(back, Ui.lp(Ui.MATCH, dp(38)));
-        LinearLayout pr = Ui.row(c);
         Ui.Btn lp = Ui.button(c, "Charger un preset", "btn");
         lp.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -148,18 +152,8 @@ public final class InstallerPage extends Tab {
                 savePreset();
             }
         });
-        pr.addView(lp, Ui.lpw(0, dp(42), 1));
-        pr.addView(sp, Ui.lpw(0, dp(42), 1));
-        LinearLayout.LayoutParams prl = Ui.lp(Ui.MATCH, Ui.WRAP);
-        prl.topMargin = dp(6);
-        right.addView(pr, prl);
-        TextView lab = Ui.text(c, "Dossier des fichiers :", 10, Ui.TEXT);
-        lab.setGravity(Gravity.CENTER);
-        lab.setPadding(0, dp(12), 0, dp(4));
-        right.addView(lab, Ui.lp(Ui.MATCH, Ui.WRAP));
-        LinearLayout g2 = Ui.row(c);
-        bInst = Ui.button(c, "Dossier\nInstall", "btn").checkable();
-        bDev = Ui.button(c, "Dossier\nde l'appareil", "btn").checkable();
+        bInst = Ui.button(c, ph ? "Install" : "Dossier\nInstall", "btn").checkable();
+        bDev = Ui.button(c, ph ? "Appareil" : "Dossier\nde l'appareil", "btn").checkable();
         bInst.setChecked(true);
         bInst.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -171,21 +165,14 @@ public final class InstallerPage extends Tab {
                 setMode("device");
             }
         });
-        g2.addView(bInst, Ui.lpw(0, dp(50), 1));
-        g2.addView(bDev, Ui.lpw(0, dp(50), 1));
-        right.addView(g2);
         Ui.Btn open = Ui.button(c, "Ouvrir le dossier", "btn");
         open.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 InstallerPage.this.m.openFolder(folder());
             }
         });
-        right.addView(open, Ui.lp(Ui.MATCH, dp(40)));
-        LinearLayout row = Ui.row(c);
-        row.setPadding(0, dp(10), 0, 0);
-        LinearLayout acts = Ui.col(c);
-        Ui.Btn add = Ui.button(c, "＋  Ajouter des APK", "btn");
-        add.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+        Ui.Btn add = Ui.button(c, ph ? "＋  Ajouter" : "＋  Ajouter des APK", "btn");
+        add.setGravity(Gravity.CENTER_VERTICAL | (ph ? Gravity.CENTER_HORIZONTAL : Gravity.START));
         add.setTextColor(Ui.ACCENT_LINE);
         add.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         add.setOnClickListener(new View.OnClickListener() {
@@ -194,7 +181,7 @@ public final class InstallerPage extends Tab {
             }
         });
         Ui.Btn del = Ui.button(c, "－  Supprimer", "btn");
-        del.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+        del.setGravity(Gravity.CENTER_VERTICAL | (ph ? Gravity.CENTER_HORIZONTAL : Gravity.START));
         del.setTextColor(Ui.RED);
         del.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         del.setOnClickListener(new View.OnClickListener() {
@@ -202,22 +189,103 @@ public final class InstallerPage extends Tab {
                 delete(targets());
             }
         });
-        acts.addView(add, Ui.lp(Ui.MATCH, dp(38)));
-        acts.addView(del, Ui.lp(Ui.MATCH, dp(38)));
-        row.addView(acts, Ui.lpw(0, Ui.WRAP, 1));
-        bQuick = Ui.button(c, "Installation\nrapide", "soft");
+        bQuick = Ui.button(c, ph ? "Installation rapide" : "Installation\nrapide", "soft");
         bQuick.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 install(targets());
             }
         });
+        final String[][] opts = {{"Accorder les permissions (-g)", "install_grant"}, {"Remplacer si déjà installée (-r)", "install_replace"},
+                {"Autoriser une version antérieure (-d)", "install_downgrade"}};
+        lblSel = Ui.text(c, ph ? "0 cochée(s)" : "Sélection : 0", 10, Ui.TEXT);
+
+        if (ph) {
+            LinearLayout bot = Ui.col(c);
+            bot.setPadding(dp(6), dp(4), dp(6), dp(6));
+            bot.setBackgroundColor(Ui.BG);
+            LinearLayout r1 = Ui.row(c);
+            r1.addView(back, Ui.lpw(0, dp(40), 1));
+            TextView fl = Ui.text(c, "Dossier :", 9, Ui.MUTED);
+            fl.setPadding(dp(8), 0, dp(4), 0);
+            r1.addView(fl);
+            r1.addView(bInst, Ui.lpw(0, dp(40), 0.9f));
+            r1.addView(bDev, Ui.lpw(0, dp(40), 0.9f));
+            bot.addView(r1);
+            LinearLayout r2 = Ui.row(c);
+            r2.setPadding(0, dp(4), 0, 0);
+            r2.addView(add, Ui.lpw(0, dp(40), 1));
+            LinearLayout.LayoutParams dl = Ui.lpw(0, dp(40), 1);
+            dl.leftMargin = dl.rightMargin = dp(4);
+            r2.addView(del, dl);
+            final Ui.Btn more = Ui.button(c, "⋮  Plus", "btn");
+            more.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    PopupMenu pm = new PopupMenu(c, more);
+                    pm.getMenu().add(0, 0, 0, "Ouvrir le dossier");
+                    pm.getMenu().add(0, 1, 1, "Charger un preset");
+                    pm.getMenu().add(0, 2, 2, "Enregistrer le preset");
+                    for (int i = 0; i < opts.length; i++)
+                        pm.getMenu().add(1, 10 + i, 10 + i, opts[i][0]).setCheckable(true)
+                                .setChecked(Config.getBool(opts[i][1], !opts[i][1].equals("install_downgrade")));
+                    pm.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+                        public boolean onMenuItemClick(android.view.MenuItem it) {
+                            int id = it.getItemId();
+                            if (id == 0) InstallerPage.this.m.openFolder(folder());
+                            else if (id == 1) loadPreset();
+                            else if (id == 2) savePreset();
+                            else if (id >= 10) {
+                                String k = opts[id - 10][1];
+                                boolean on = !Config.getBool(k, !k.equals("install_downgrade"));
+                                Config.setBool(k, on);
+                                InstallerPage.this.m.toast(opts[id - 10][0] + (on ? " : activé" : " : désactivé"), 2500);
+                            }
+                            return true;
+                        }
+                    });
+                    pm.show();
+                }
+            });
+            r2.addView(more, Ui.lpw(0, dp(40), 0.8f));
+            bot.addView(r2);
+            LinearLayout r3 = Ui.row(c);
+            r3.setPadding(0, dp(4), 0, 0);
+            r3.addView(lblSel, Ui.lpw(0, Ui.WRAP, 1));
+            bQuick.setPadding(dp(16), 0, dp(16), 0);
+            r3.addView(bQuick, Ui.lp(Ui.WRAP, dp(44)));
+            bot.addView(r3);
+            lay.addView(bot, Ui.lp(Ui.MATCH, Ui.WRAP));
+            return;
+        }
+
+        LinearLayout right = Ui.col(c);
+        right.setPadding(dp(6), dp(6), dp(6), dp(6));
+        right.addView(back, Ui.lp(Ui.MATCH, dp(38)));
+        LinearLayout pr = Ui.row(c);
+        pr.addView(lp, Ui.lpw(0, dp(42), 1));
+        pr.addView(sp, Ui.lpw(0, dp(42), 1));
+        LinearLayout.LayoutParams prl = Ui.lp(Ui.MATCH, Ui.WRAP);
+        prl.topMargin = dp(6);
+        right.addView(pr, prl);
+        TextView lab = Ui.text(c, "Dossier des fichiers :", 10, Ui.TEXT);
+        lab.setGravity(Gravity.CENTER);
+        lab.setPadding(0, dp(12), 0, dp(4));
+        right.addView(lab, Ui.lp(Ui.MATCH, Ui.WRAP));
+        LinearLayout g2 = Ui.row(c);
+        g2.addView(bInst, Ui.lpw(0, dp(50), 1));
+        g2.addView(bDev, Ui.lpw(0, dp(50), 1));
+        right.addView(g2);
+        right.addView(open, Ui.lp(Ui.MATCH, dp(40)));
+        LinearLayout row = Ui.row(c);
+        row.setPadding(0, dp(10), 0, 0);
+        LinearLayout acts = Ui.col(c);
+        acts.addView(add, Ui.lp(Ui.MATCH, dp(38)));
+        acts.addView(del, Ui.lp(Ui.MATCH, dp(38)));
+        row.addView(acts, Ui.lpw(0, Ui.WRAP, 1));
         LinearLayout.LayoutParams ql = Ui.lp(dp(120), dp(76));
         ql.leftMargin = dp(6);
         row.addView(bQuick, ql);
         right.addView(row);
         right.addView(Ui.space(c, 1, 10));
-        String[][] opts = {{"Accorder les permissions (-g)", "install_grant"}, {"Remplacer si déjà installée (-r)", "install_replace"},
-                {"Autoriser une version antérieure (-d)", "install_downgrade"}};
         for (final String[] o : opts) {
             Widgets.Check cb = new Widgets.Check(c, o[0]);
             cb.setChecked(Config.getBool(o[1], !o[1].equals("install_downgrade")));
@@ -229,11 +297,16 @@ public final class InstallerPage extends Tab {
             right.addView(cb);
         }
         right.addView(Ui.vstretch(c));
-        lblSel = Ui.text(c, "Sélection : 0", 10, Ui.TEXT);
         lblSel.setBackground(Ui.box(0, Ui.BORDER, 0, 1));
         lblSel.setPadding(dp(6), dp(5), dp(6), dp(5));
         right.addView(lblSel, Ui.lp(Ui.MATCH, Ui.WRAP));
         lay.addView(right, Ui.lp(dp(290), Ui.MATCH));
+    }
+
+    /** Colonne affichée -> critère de tri. */
+    private int logical(int col) {
+        if (!Ui.phone || col < 0) return col;
+        return new int[]{C_CHECK, C_NAME, C_STATE}[Math.min(col, 2)];
     }
 
     // ------------------------------------------------------------------ dossiers
@@ -253,7 +326,8 @@ public final class InstallerPage extends Tab {
 
     void onDevice() {
         String name = deviceName();
-        bDev.setText("Dossier\n" + (name == null ? "de l'appareil" : name));
+        if (Ui.phone) bDev.setText(name == null ? "Appareil" : name);
+        else bDev.setText("Dossier\n" + (name == null ? "de l'appareil" : name));
         bDev.setEnabled(name != null);
         if (name == null && "device".equals(mode)) {
             mode = "install";
@@ -445,7 +519,7 @@ public final class InstallerPage extends Tab {
                     || (f.label != null && f.label.toLowerCase(Locale.ROOT).contains(search))
                     || (f.pkg != null && f.pkg.toLowerCase(Locale.ROOT).contains(search))) shown.add(f);
         }
-        final int col = cols.sortCol;
+        final int col = logical(cols.sortCol);
         final boolean asc = cols.sortAsc;
         Collections.sort(shown, new Comparator<Info>() {
             public int compare(Info a, Info b) {
@@ -474,7 +548,7 @@ public final class InstallerPage extends Tab {
         });
         adapter.notifyDataSetChanged();
         lblTotal.setText(String.valueOf(shown.size()));
-        lblSel.setText("Sélection : " + checked.size());
+        lblSel.setText(Ui.phone ? checked.size() + " cochée(s)" : "Sélection : " + checked.size());
         boolean all = !shown.isEmpty();
         for (Info f : shown) if (!checked.contains(f.path.getPath())) all = false;
         cbAll.setChecked(all);
@@ -517,6 +591,17 @@ public final class InstallerPage extends Tab {
             ic.setLayoutParams(il);
             if (f.icon != null) ic.setImageBitmap(f.icon);
             else ic.setImageDrawable(Ui.icon(c, "app", 0xff7fb8ff));
+            String mo = String.format(Locale.ROOT, "%.2f", f.size / 1048576.0).replace(".", ",") + " Mo";
+            if (Ui.phone) {
+                LinearLayout tc = (LinearLayout) nc.getChildAt(1);
+                ((TextView) tc.getChildAt(0)).setText(name(f));
+                ((TextView) tc.getChildAt(1)).setText(f.path.getName() + (f.version == null ? "" : "  ·  " + f.version) + "  ·  " + mo);
+                String[] st = state(f);
+                TextView s = (TextView) row.getChildAt(2);
+                s.setText(st[0]);
+                s.setTextColor(st[1] == null ? Ui.TEXT : android.graphics.Color.parseColor(st[1]));
+                return row;
+            }
             ((TextView) nc.getChildAt(1)).setText(name(f));
             ((TextView) row.getChildAt(2)).setText(f.path.getName());
             ((TextView) row.getChildAt(3)).setText(f.pkg == null ? "" : f.pkg);
@@ -525,7 +610,7 @@ public final class InstallerPage extends Tab {
             TextView s = (TextView) row.getChildAt(5);
             s.setText(st[0]);
             s.setTextColor(st[1] == null ? Ui.TEXT : android.graphics.Color.parseColor(st[1]));
-            ((TextView) row.getChildAt(6)).setText(String.format(Locale.ROOT, "%.2f", f.size / 1048576.0).replace(".", ",") + " Mo");
+            ((TextView) row.getChildAt(6)).setText(mo);
             return row;
         }
     }
@@ -546,11 +631,29 @@ public final class InstallerPage extends Tab {
         nc.setPadding(dp(8), 0, dp(4), 0);
         ImageView ic = new ImageView(c);
         nc.addView(ic, Ui.lp(dp(30), dp(30)));
-        TextView n = Ui.single(Ui.text(c, "", 11, Ui.TEXT));
-        n.setPadding(dp(10), 0, 0, 0);
-        nc.addView(n, Ui.lpw(0, Ui.WRAP, 1));
-        row.addView(nc);
-        for (int i = 2; i < 7; i++) {
+        if (Ui.phone) {
+            nc.setPadding(dp(4), 0, dp(4), 0);
+            LinearLayout tc = Ui.col(c);
+            tc.setPadding(dp(10), 0, 0, 0);
+            tc.addView(Ui.single(Ui.text(c, "", 11, Ui.TEXT)));
+            TextView sub = Ui.single(Ui.text(c, "", 8, Ui.MUTED));
+            sub.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+            sub.setPadding(0, dp(3), 0, 0);
+            tc.addView(sub);
+            nc.addView(tc, Ui.lpw(0, Ui.WRAP, 1));
+            row.addView(nc);
+            TextView st = Ui.text(c, "", 8, Ui.MUTED);
+            st.setMaxLines(2);
+            st.setGravity(Gravity.CENTER_VERTICAL);
+            st.setPadding(dp(4), 0, dp(6), 0);
+            row.addView(st);
+        } else {
+            TextView n = Ui.single(Ui.text(c, "", 11, Ui.TEXT));
+            n.setPadding(dp(10), 0, 0, 0);
+            nc.addView(n, Ui.lpw(0, Ui.WRAP, 1));
+            row.addView(nc);
+        }
+        for (int i = 2; i < 7 && !Ui.phone; i++) {
             TextView t = Ui.single(Ui.text(c, "", 10, Ui.MUTED));
             t.setGravity(Gravity.CENTER_VERTICAL | (i == C_SIZE ? Gravity.END : Gravity.START));
             t.setPadding(dp(6), 0, dp(8), 0);

@@ -26,24 +26,50 @@ public final class UpdateDialog {
 
     /** Vérifie GitHub ; manual = message aussi quand tout est à jour ou en erreur. */
     public static void check(final MainActivity m, final boolean manual) {
-        m.ctl.submit(new Callable<Updater.Release>() {
-            public Updater.Release call() throws Exception {
-                return Updater.check();
-            }
-        }, new Controller.Done<Updater.Release>() {
-            public void done(Updater.Release r, Exception e) {
-                if (e != null) {
-                    if (manual) m.toast("Impossible de vérifier les mises à jour : " + e.getMessage());
-                    return;
+        if (manual) m.toast("Recherche des mises à jour…", 3000);
+        // Fil dédié : la vérification ne doit jamais attendre derrière une opération ADB en cours
+        Thread t = new Thread(new Runnable() {
+            public void run() {
+                Updater.Release r = null;
+                String err = null;
+                try {
+                    r = Updater.check();
+                } catch (Throwable e) {
+                    err = e.getClass().getSimpleName() + (e.getMessage() == null ? "" : " : " + e.getMessage());
                 }
-                if (r == null) {
-                    if (manual) m.toast("ADB Pilot est à jour (version " + MainActivity.VERSION + ").");
-                    return;
-                }
-                if (!manual && r.version.equals(Config.getStr("update_skip", ""))) return;
-                show(m, r);
+                final Updater.Release rr = r;
+                final String ee = err;
+                m.runOnUiThread(new Runnable() {
+                    public void run() {
+                        done(m, manual, rr, ee);
+                    }
+                });
             }
-        });
+        }, "update-check");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    private static void done(MainActivity m, boolean manual, Updater.Release r, String err) {
+        if (m.isFinishing()) return;
+        if (err != null) {
+            m.ctl.log("Mises à jour : vérification impossible (" + fr.paradoxxx.adbpilot.Html.esc(err) + ")", "warn");
+            if (manual) m.toast("Impossible de vérifier les mises à jour : " + err, 6000);
+            return;
+        }
+        String seen = Updater.lastSeen.isEmpty() ? "aucune" : Updater.lastSeen;
+        if (r == null) {
+            m.ctl.log("Mises à jour : version installée " + MainActivity.VERSION + ", dernière publiée " + seen + ".", "info");
+            if (manual) m.toast("ADB Pilot est à jour (version " + MainActivity.VERSION + ", dernière publiée : " + seen + ").", 5000);
+            return;
+        }
+        m.ctl.log("Mises à jour : " + r.tag + " disponible (installée " + MainActivity.VERSION + ").", "info");
+        if (!manual && r.version.equals(Config.getStr("update_skip", ""))) return;
+        try {
+            show(m, r);
+        } catch (Throwable e) {
+            m.toast("ADB Pilot " + r.version + " est disponible : " + Updater.RELEASES, 8000);
+        }
     }
 
     static void show(final MainActivity m, final Updater.Release rel) {

@@ -58,7 +58,7 @@ import java.util.Map;
 import static fr.paradoxxx.adbpilot.ui.Ui.dp;
 
 public final class MainActivity extends Activity implements Controller.Ui {
-    public static final String VERSION = "0.2.1";
+    public static final String VERSION = "0.3.2";
     private static final String ACTION_USB_PERMISSION = "fr.paradoxxx.adbpilot.USB_PERMISSION";
     private static final int REQ_FILES = 41, REQ_PUSH = 42;
 
@@ -73,6 +73,7 @@ public final class MainActivity extends Activity implements Controller.Ui {
     private final List<Tab> tabs = new ArrayList<Tab>();
     private final List<TextView> tabBtns = new ArrayList<TextView>();
     private int curTab = -1;
+    private android.widget.HorizontalScrollView tabScroll;
     public AppsTab apps;
     public ToolsTab tools;
     public StoreTab store;
@@ -88,6 +89,9 @@ public final class MainActivity extends Activity implements Controller.Ui {
         Config.init(this);
         Ui.init(this);
         Ui.fontScale = Config.getInt("font_scale", 100) / 100f;
+        // Tablette : paysage comme la version PC · smartphone : portrait (scrcpy passe en paysage tout seul)
+        setRequestedOrientation(Ui.phone ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         ctl = new Controller(this);
         ctl.usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
@@ -100,6 +104,11 @@ public final class MainActivity extends Activity implements Controller.Ui {
         f.addAction(ACTION_USB_PERMISSION);
         registerReceiver(usbReceiver, f);
         registerReceiver(installReceiver, new IntentFilter(Updater.ACTION_STATUS));
+        h.postDelayed(new Runnable() {
+            public void run() {
+                if (!isFinishing()) fr.paradoxxx.adbpilot.ui.Dialogs.targetNoticeOnce(MainActivity.this);
+            }
+        }, 700);
         if (Config.getBool("update_check", true)) h.postDelayed(new Runnable() {
             public void run() {
                 fr.paradoxxx.adbpilot.ui.UpdateDialog.check(MainActivity.this, false);
@@ -215,33 +224,21 @@ public final class MainActivity extends Activity implements Controller.Ui {
         root.setBackgroundColor(Ui.BG);
         LinearLayout main = Ui.col(this);
         root.addView(main, new FrameLayout.LayoutParams(Ui.MATCH, Ui.MATCH));
+        boolean ph = Ui.phone;
 
-        header = Ui.col(this);
-        header.setBackgroundColor(Ui.HEADER);
-        header.setPadding(dp(8), dp(4), dp(10), dp(6));
-        LinearLayout r1 = Ui.row(this);
+        // --- éléments de l'en-tête (disposés ensuite selon la taille de l'écran)
         ImageView logo = new ImageView(this);
         logo.setImageBitmap(Ui.iconBitmap(this, "logo"));
-        r1.addView(logo, Ui.lp(dp(34), dp(34)));
-        r1.addView(Ui.space(this, 4, 1));
-        TextView la = Ui.text(this, "ADB", 22, Ui.TITLE);
+        TextView la = Ui.text(this, "ADB", ph ? 18 : 22, Ui.TITLE);
         la.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
-        TextView lb = Ui.text(this, "Pilot", 18, Ui.TEXT);
+        TextView lb = Ui.text(this, "Pilot", ph ? 15 : 18, Ui.TEXT);
         lb.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-        r1.addView(la);
-        r1.addView(lb);
-        r1.addView(Ui.space(this, 14, 1));
         ImageView folder = Ui.iconButton(this, "folder", Ui.TEXT, 22);
         folder.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 openFolder(Config.userDir());
             }
         });
-        r1.addView(folder);
-        r1.addView(Ui.stretch(this));
-
-        LinearLayout conn = Ui.col(this);
-        LinearLayout c0 = Ui.row(this);
         ip = Ui.edit(this, "IP de l'appareil");
         ip.setTypeface(Typeface.MONOSPACE);
         ip.setBackground(Ui.box(0x40000000, 0xff555555, 0, 1));
@@ -254,7 +251,6 @@ public final class MainActivity extends Activity implements Controller.Ui {
                 return true;
             }
         });
-        c0.addView(ip, Ui.lp(dp(170), dp(32)));
         bScan = Ui.button(this, "Détecter", "scan");
         bScan.icon(Ui.icon(this, "search", 0xffffffff), 16);
         bScan.setOnClickListener(new View.OnClickListener() {
@@ -263,30 +259,18 @@ public final class MainActivity extends Activity implements Controller.Ui {
                 scan.toggle();
             }
         });
-        LinearLayout.LayoutParams sl = Ui.lp(Ui.WRAP, dp(32));
-        sl.leftMargin = dp(4);
-        c0.addView(bScan, sl);
         bGo = Ui.button(this, "GO !", "go");
         bGo.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 connectClicked();
             }
         });
-        LinearLayout.LayoutParams gl = Ui.lp(dp(58), dp(32));
-        gl.leftMargin = dp(4);
-        c0.addView(bGo, gl);
         final ImageView hist = Ui.iconButton(this, "history", Ui.TEXT, 22);
         hist.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 historyMenu(hist);
             }
         });
-        c0.addView(hist);
-        conn.addView(c0);
-        LinearLayout c1 = Ui.row(this);
-        c1.setPadding(0, dp(2), 0, 0);
-        c1.addView(Ui.stretch(this));
-        c1.addView(Ui.text(this, "Port : ", 8, Ui.TEXT));
         final EditText port = Ui.edit(this, "");
         String pv = Config.getStr("port", "auto");
         port.setText(pv.equalsIgnoreCase("auto") ? "Auto" : pv);
@@ -303,48 +287,33 @@ public final class MainActivity extends Activity implements Controller.Ui {
                 Config.setStr("port", t.isEmpty() || t.equalsIgnoreCase("auto") ? "auto" : t);
             }
         });
-        c1.addView(Widgets.editableCombo(this, port, "Auto", "5555", "5556", "5037"), Ui.lp(dp(84), dp(28)));
-        LinearLayout pr = Ui.row(this);
-        pr.addView(c1, Ui.lp(dp(170), Ui.WRAP));
-        conn.addView(pr);
-        r1.addView(conn);
-        header.addView(r1);
-
-        LinearLayout r2 = Ui.row(this);
-        LinearLayout left = Ui.row(this);
+        LinearLayout portBox = Widgets.editableCombo(this, port, "Auto", "5555", "5556", "5037");
         ImageView refresh = Ui.iconButton(this, "refresh", Ui.TEXT, 22);
         refresh.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 refreshAll();
             }
         });
-        left.addView(refresh);
-        devLabel = Ui.single(Ui.bold(Ui.text(this, "Aucun appareil connecté", 13, Ui.MUTED)));
-        devLabel.setPadding(dp(4), 0, dp(10), 0);
+        devLabel = Ui.single(Ui.bold(Ui.text(this, "Aucun appareil connecté", ph ? 11 : 13, Ui.MUTED)));
+        devLabel.setPadding(dp(4), 0, dp(ph ? 6 : 10), 0);
         devLabel.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 pickDevice();
             }
         });
-        left.addView(devLabel, Ui.lpw(Ui.WRAP, Ui.WRAP, 0));
-        bInfo = Ui.button(this, "Infos appareil", "tcpip");
+        bInfo = Ui.button(this, infoText(), "tcpip");
         bInfo.setEnabled(false);
         bInfo.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 if (!specsText.isEmpty()) toast(specsText, 12000);
             }
         });
-        left.addView(bInfo, Ui.lp(Ui.WRAP, dp(26)));
         bTcpip = Ui.button(this, "Passer en Wi-Fi", "tcpip");
         bTcpip.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 tools.toWifi();
             }
         });
-        LinearLayout.LayoutParams tl = Ui.lp(Ui.WRAP, dp(26));
-        tl.leftMargin = dp(6);
-        left.addView(bTcpip, tl);
-        r2.addView(left, Ui.lpw(0, Ui.WRAP, 1));
         LinearLayout sbox = Ui.row(this);
         sbox.setBackgroundColor(0x40000000);
         sbox.addView(Ui.image(this, "search", 0xffcccccc, 18));
@@ -372,17 +341,102 @@ public final class MainActivity extends Activity implements Controller.Ui {
         });
         sbox.addView(clr);
         sbox.setPadding(dp(6), 0, dp(2), 0);
-        r2.addView(sbox, Ui.lp(dp(260), dp(34)));
-        r2.addView(new View(this), Ui.lpw(0, 1, 1));
-        r2.setPadding(0, dp(2), 0, 0);
-        header.addView(r2);
+
+        header = Ui.col(this);
+        header.setBackgroundColor(Ui.HEADER);
+        if (ph) {
+            // Smartphone : 4 lignes compactes sur toute la largeur
+            header.setPadding(dp(6), dp(4), dp(6), dp(6));
+            LinearLayout r1 = Ui.row(this);
+            r1.addView(logo, Ui.lp(dp(28), dp(28)));
+            r1.addView(Ui.space(this, 4, 1));
+            r1.addView(la);
+            r1.addView(lb);
+            r1.addView(Ui.stretch(this));
+            r1.addView(bScan, Ui.lp(Ui.WRAP, dp(32)));
+            r1.addView(Ui.space(this, 2, 1));
+            r1.addView(hist);
+            r1.addView(folder);
+            header.addView(r1);
+            LinearLayout r2 = Ui.row(this);
+            r2.setPadding(0, dp(4), 0, 0);
+            r2.addView(ip, Ui.lpw(0, dp(36), 1));
+            LinearLayout.LayoutParams pl = Ui.lp(dp(80), dp(36));
+            pl.leftMargin = dp(4);
+            r2.addView(portBox, pl);
+            LinearLayout.LayoutParams gl = Ui.lp(dp(56), dp(36));
+            gl.leftMargin = dp(4);
+            r2.addView(bGo, gl);
+            header.addView(r2);
+            LinearLayout r3 = Ui.row(this);
+            r3.setPadding(0, dp(3), 0, 0);
+            r3.addView(refresh);
+            r3.addView(devLabel, Ui.lpw(0, Ui.WRAP, 1));
+            r3.addView(bInfo, Ui.lp(Ui.WRAP, dp(28)));
+            LinearLayout.LayoutParams tl = Ui.lp(Ui.WRAP, dp(28));
+            tl.leftMargin = dp(4);
+            r3.addView(bTcpip, tl);
+            header.addView(r3);
+            LinearLayout.LayoutParams sl = Ui.lp(Ui.MATCH, dp(36));
+            sl.topMargin = dp(4);
+            header.addView(sbox, sl);
+        } else {
+            header.setPadding(dp(8), dp(4), dp(10), dp(6));
+            LinearLayout r1 = Ui.row(this);
+            r1.addView(logo, Ui.lp(dp(34), dp(34)));
+            r1.addView(Ui.space(this, 4, 1));
+            r1.addView(la);
+            r1.addView(lb);
+            r1.addView(Ui.space(this, 14, 1));
+            r1.addView(folder);
+            r1.addView(Ui.stretch(this));
+            LinearLayout conn = Ui.col(this);
+            LinearLayout c0 = Ui.row(this);
+            c0.addView(ip, Ui.lp(dp(170), dp(32)));
+            LinearLayout.LayoutParams sl = Ui.lp(Ui.WRAP, dp(32));
+            sl.leftMargin = dp(4);
+            c0.addView(bScan, sl);
+            LinearLayout.LayoutParams gl = Ui.lp(dp(58), dp(32));
+            gl.leftMargin = dp(4);
+            c0.addView(bGo, gl);
+            c0.addView(hist);
+            conn.addView(c0);
+            LinearLayout c1 = Ui.row(this);
+            c1.setPadding(0, dp(2), 0, 0);
+            c1.addView(Ui.stretch(this));
+            c1.addView(Ui.text(this, "Port : ", 8, Ui.TEXT));
+            c1.addView(portBox, Ui.lp(dp(84), dp(28)));
+            LinearLayout pr = Ui.row(this);
+            pr.addView(c1, Ui.lp(dp(170), Ui.WRAP));
+            conn.addView(pr);
+            r1.addView(conn);
+            header.addView(r1);
+
+            LinearLayout r2 = Ui.row(this);
+            LinearLayout left = Ui.row(this);
+            left.addView(refresh);
+            left.addView(devLabel, Ui.lpw(Ui.WRAP, Ui.WRAP, 0));
+            left.addView(bInfo, Ui.lp(Ui.WRAP, dp(26)));
+            LinearLayout.LayoutParams tl = Ui.lp(Ui.WRAP, dp(26));
+            tl.leftMargin = dp(6);
+            left.addView(bTcpip, tl);
+            r2.addView(left, Ui.lpw(0, Ui.WRAP, 1));
+            r2.addView(sbox, Ui.lp(dp(260), dp(34)));
+            r2.addView(new View(this), Ui.lpw(0, 1, 1));
+            r2.setPadding(0, dp(2), 0, 0);
+            header.addView(r2);
+        }
         main.addView(header, Ui.lp(Ui.MATCH, Ui.WRAP));
 
         // Onglets
         LinearLayout tw = Ui.col(this);
-        tw.setPadding(dp(4), dp(4), dp(4), 0);
+        tw.setPadding(dp(ph ? 2 : 4), dp(4), dp(ph ? 2 : 4), 0);
         LinearLayout tabBar = Ui.row(this);
-        tw.addView(tabBar);
+        if (ph) {
+            tabScroll = Ui.hscroll(this, tabBar);
+            tabScroll.setFillViewport(false);
+            tw.addView(tabScroll, Ui.lp(Ui.MATCH, Ui.WRAP));
+        } else tw.addView(tabBar);
         content = new FrameLayout(this);
         content.setBackground(Ui.box(Ui.PANEL, Ui.BORDER, 0, 1));
         tw.addView(content, Ui.lpw(Ui.MATCH, 0, 1));
@@ -399,7 +453,7 @@ public final class MainActivity extends Activity implements Controller.Ui {
             final int idx = i;
             tabs.add(all[i]);
             TextView t = Ui.text(this, names[i], 10, Ui.TEXT);
-            t.setPadding(dp(14), dp(7), dp(14), dp(7));
+            t.setPadding(dp(ph ? 12 : 14), dp(ph ? 9 : 7), dp(ph ? 12 : 14), dp(ph ? 9 : 7));
             t.setClickable(true);
             t.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
@@ -431,9 +485,11 @@ public final class MainActivity extends Activity implements Controller.Ui {
             }
         });
         int sw = getResources().getDisplayMetrics().widthPixels;
-        FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(Math.min(dp(780), sw - dp(16)), Ui.WRAP, Gravity.TOP | Gravity.END);
+        final FrameLayout.LayoutParams sp = ph ? new FrameLayout.LayoutParams(Ui.MATCH, Ui.WRAP, Gravity.TOP)
+                : new FrameLayout.LayoutParams(Math.min(dp(780), sw - dp(16)), Ui.WRAP, Gravity.TOP | Gravity.END);
         sp.topMargin = dp(46);
         sp.rightMargin = dp(8);
+        if (ph) sp.leftMargin = dp(8);
         root.addView(scan, sp);
         toastView = Ui.text(this, "", 10, 0xffffffff);
         toastView.setGravity(Gravity.CENTER);
@@ -441,18 +497,27 @@ public final class MainActivity extends Activity implements Controller.Ui {
         toastView.setPadding(dp(18), dp(12), dp(18), dp(12));
         toastView.setVisibility(View.GONE);
         toastView.setElevation(dp(20));
-        FrameLayout.LayoutParams tlp = new FrameLayout.LayoutParams(dp(560), Ui.WRAP, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        FrameLayout.LayoutParams tlp = new FrameLayout.LayoutParams(ph ? Ui.MATCH : dp(560), Ui.WRAP, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
         tlp.bottomMargin = dp(50);
+        if (ph) tlp.leftMargin = tlp.rightMargin = dp(12);
         root.addView(toastView, tlp);
         root.setOnTouchListener(null);
         setContentView(root);
         header.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
             public void onLayoutChange(View v, int l, int t, int r, int b, int ol, int ot, int or, int ob) {
                 overlay.topOffset = b;
+                if (Ui.phone && sp.topMargin != b) {  // panneau Détecter juste sous l'en-tête
+                    sp.topMargin = b;
+                    scan.setLayoutParams(sp);
+                }
             }
         });
         showTab(0);
         bTcpip.setVisibility(View.GONE);
+    }
+
+    private static String infoText() {
+        return Ui.phone ? "Infos" : "Infos appareil";
     }
 
     public void showTab(int i) {
@@ -471,7 +536,16 @@ public final class MainActivity extends Activity implements Controller.Ui {
         tabs.get(i).view.setVisibility(View.VISIBLE);
         tabs.get(i).onShown();
         View sbox = (View) search.getParent();
-        sbox.setVisibility(i == 0 || i == 1 ? View.VISIBLE : View.INVISIBLE);
+        sbox.setVisibility(i == 0 || i == 1 ? View.VISIBLE : (Ui.phone ? View.GONE : View.INVISIBLE));
+        if (tabScroll != null) {
+            final View tb = tabBtns.get(i);
+            tabScroll.post(new Runnable() {
+                public void run() {
+                    int x = tb.getLeft() - (tabScroll.getWidth() - tb.getWidth()) / 2;
+                    tabScroll.smoothScrollTo(Math.max(0, x), 0);
+                }
+            });
+        }
     }
 
     public void showTab(Tab t) {
@@ -537,7 +611,7 @@ public final class MainActivity extends Activity implements Controller.Ui {
         bTcpip.setVisibility(d != null && d.usb ? View.VISIBLE : View.GONE);
         if (d == null || !"device".equals(d.state)) {
             specsText = "";
-            bInfo.setText("Infos appareil");
+            bInfo.setText(infoText());
             bInfo.setEnabled(false);
         }
         for (Tab t : tabs) t.onDevice(d);
@@ -621,7 +695,7 @@ public final class MainActivity extends Activity implements Controller.Ui {
         if (sp.get("ram_fake") != null)
             tip.append("\n⚠ RAM truquée par la ROM : elle annonce ").append(sp.get("ram_fake")).append(" Go, l'appareil n'en a que ").append(sp.get("ram_gb")).append(" Go.");
         specsText = summary + "\n\n" + tip;
-        bInfo.setText("Infos appareil" + (warn ? "  ⚠" : ""));
+        bInfo.setText(infoText() + (warn ? "  ⚠" : ""));
         bInfo.setEnabled(true);
         for (Tab t : tabs) t.onInfo(info, sp);
     }

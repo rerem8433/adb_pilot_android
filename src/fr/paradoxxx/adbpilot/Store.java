@@ -25,7 +25,33 @@ import java.util.regex.Pattern;
 /** Catalogue du Store (copie GitHub sinon celle fournie), résolution des liens, téléchargement. */
 public final class Store {
     public static final String REMOTE = "https://raw.githubusercontent.com/rerem8433/adb_pilot/main/store/catalog.json";
-    static final String UA = "Mozilla/5.0 (Linux; Android) ADBPilot";
+    static final String UA = "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36 ADBPilot";
+
+    /** GET avec redirections suivies même de https vers http (miroirs) et un User-Agent de navigateur. */
+    public static byte[] http(String url, int timeoutMs) throws Exception {
+        String u = url;
+        for (int i = 0; i < 8; i++) {
+            HttpURLConnection c = (HttpURLConnection) new URL(u).openConnection();
+            c.setInstanceFollowRedirects(false);
+            c.setRequestProperty("User-Agent", UA);
+            c.setRequestProperty("Accept", "*/*");
+            c.setConnectTimeout(timeoutMs);
+            c.setReadTimeout(timeoutMs);
+            try {
+                int code = c.getResponseCode();
+                String loc = c.getHeaderField("Location");
+                if (code >= 300 && code < 400 && loc != null) {
+                    u = new URL(new URL(u), loc).toString();
+                    continue;
+                }
+                if (code >= 400) throw new Exception("HTTP " + code + " sur " + new URL(u).getHost());
+                return Core.readAll(c.getInputStream());
+            } finally {
+                c.disconnect();
+            }
+        }
+        throw new Exception("trop de redirections");
+    }
 
     private static File cached() {
         return new File(Config.cacheDir("store"), "catalog.json");
@@ -82,6 +108,23 @@ public final class Store {
         JSONObject src = app.optJSONObject("source");
         if (src == null) throw new Exception("source inconnue");
         String fam = family(abi);
+        if (src.has("fdroid")) {
+            // F-Droid : dernière version publiée, une construction par architecture (suffixe du versionCode)
+            String pkg = src.getString("fdroid");
+            JSONObject d = new JSONObject(new String(http("https://f-droid.org/api/v1/packages/" + pkg, 20000), "UTF-8"));
+            JSONArray ps = d.optJSONArray("packages");
+            JSONObject suf = src.optJSONObject("abi_suffix");
+            int want = suf != null && suf.has(fam) ? suf.getInt(fam) : -1;
+            JSONObject best = null;
+            if (ps != null) for (int i = 0; i < ps.length(); i++) {
+                JSONObject p = ps.getJSONObject(i);
+                if (want >= 0 && p.getLong("versionCode") % 10 != want) continue;
+                if (best == null || p.getLong("versionCode") > best.getLong("versionCode")) best = p;
+            }
+            if (best == null) throw new Exception("aucune version F-Droid pour cette architecture (" + fam + ")");
+            return new String[]{"https://f-droid.org/repo/" + pkg + "_" + best.getLong("versionCode") + ".apk",
+                    pkg + "_" + best.optString("versionName", String.valueOf(best.getLong("versionCode"))) + "_" + abiName(fam) + ".apk"};
+        }
         if (src.has("url")) {
             String u = src.getString("url");
             String path = new URL(u).getPath();
@@ -149,6 +192,7 @@ public final class Store {
         JSONObject src = app.optJSONObject("source");
         if (src == null) return "";
         if (src.has("github")) return "GitHub · " + src.optString("github");
+        if (src.has("fdroid")) return "F-Droid";
         String u = src.optString("url", src.optString("index", src.optString("page", "")));
         try {
             return new URL(u).getHost().replace("www.", "");

@@ -42,9 +42,54 @@ public final class Ui {
             YELLOW = 0xffe6c22e, DISABLED_TXT = 0xff8a8a8e;
     public static float density = 1;
     public static float fontScale = 1;
+    /** Disposition « smartphone » : écran de moins de 600 dp dans sa plus petite largeur (ou choix forcé). */
+    public static boolean phone;
+    private static Context app;
 
     public static void init(Context c) {
+        app = c.getApplicationContext();
         density = c.getResources().getDisplayMetrics().density;
+        String mode = fr.paradoxxx.adbpilot.Config.getStr("layout", "auto");
+        if ("phone".equals(mode)) phone = true;
+        else if ("tablet".equals(mode)) phone = false;
+        else phone = isSmallScreen(c);
+    }
+
+    public static boolean isSmallScreen(Context c) {
+        return c.getResources().getConfiguration().smallestScreenWidthDp < 600;
+    }
+
+    /** Largeur / hauteur actuelles de l'écran (px), à jour après une rotation. */
+    public static int screenW() {
+        return app == null ? dp(800) : app.getResources().getDisplayMetrics().widthPixels;
+    }
+
+    public static int screenH() {
+        return app == null ? dp(600) : app.getResources().getDisplayMetrics().heightPixels;
+    }
+
+    /** Largeur d'une boîte de dialogue : celle de la version tablette, bornée à l'écran. */
+    public static int dlgW(int widthDp) {
+        return Math.min(dp(widthDp), screenW() - dp(phone ? 16 : 32));
+    }
+
+    /** « la tablette » / « le téléphone » selon l'appareil qui fait tourner ADB Pilot. */
+    public static String self() {
+        return phone ? "le téléphone" : "la tablette";
+    }
+
+    /** Valeur différente en disposition smartphone. */
+    public static int pick(int tablet, int phoneVal) {
+        return phone ? phoneVal : tablet;
+    }
+
+    /** Défilement horizontal (onglets, filtres, puces) sans barre visible. */
+    public static android.widget.HorizontalScrollView hscroll(Context c, View child) {
+        android.widget.HorizontalScrollView h = new android.widget.HorizontalScrollView(c);
+        h.setHorizontalScrollBarEnabled(false);
+        h.setFillViewport(true);
+        h.addView(child);
+        return h;
     }
 
     public static int dp(float v) {

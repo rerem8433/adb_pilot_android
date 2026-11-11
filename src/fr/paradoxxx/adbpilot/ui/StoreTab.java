@@ -126,7 +126,12 @@ public final class StoreTab extends Tab {
         lay.setPadding(dp(10), dp(8), dp(10), dp(8));
         view = lay;
         chipRow = Ui.row(c);
-        lay.addView(chipRow);
+        if (Ui.phone) {
+            lay.setPadding(dp(6), dp(6), dp(6), dp(4));
+            android.widget.HorizontalScrollView hs = Ui.hscroll(c, chipRow);
+            hs.setFillViewport(false);
+            lay.addView(hs, Ui.lp(Ui.MATCH, Ui.WRAP));
+        } else lay.addView(chipRow);
         scroll = new ScrollView(c);
         grid = Ui.col(c);
         grid.setPadding(dp(4), dp(4), dp(4), dp(4));
@@ -189,7 +194,7 @@ public final class StoreTab extends Tab {
     private int columns() {
         int w = scroll.getWidth();
         if (w <= 0) w = c.getResources().getDisplayMetrics().widthPixels - dp(40);
-        return Math.max(1, (w - dp(8)) / dp(332));
+        return Math.max(1, (w - dp(8)) / dp(Ui.phone ? 300 : 332));
     }
 
     private boolean match(JSONObject a) {
@@ -231,11 +236,12 @@ public final class StoreTab extends Tab {
                     row.setGravity(Gravity.TOP);
                     grid.addView(row);
                 }
-                LinearLayout.LayoutParams lp = Ui.lp(dp(320), dp(134));
-                lp.rightMargin = dp(12);
-                lp.bottomMargin = dp(12);
+                LinearLayout.LayoutParams lp = Ui.phone ? Ui.lpw(0, dp(134), 1) : Ui.lp(dp(320), dp(134));
+                lp.rightMargin = dp(Ui.phone ? (cols > 1 && i % cols < cols - 1 ? 8 : 0) : 12);
+                lp.bottomMargin = dp(Ui.phone ? 8 : 12);
                 row.addView(l.get(i).v, lp);
             }
+            if (Ui.phone && row != null) for (int k = l.size() % cols; k > 0 && k < cols; k++) row.addView(new View(c), Ui.lpw(0, 1, 1));
             shown += l.size();
         }
         if (shown == 0) {
@@ -267,20 +273,22 @@ public final class StoreTab extends Tab {
                 for (final Card cd : l) {
                     Bitmap bm = null;
                     String url = cd.app.optString("icon", "");
-                    File f = new File(Config.cacheDir("store"), "icon_" + cd.app.optString("id") + ".png");
+                    // cache par URL : changer l'icône dans le catalogue la recharge
+                    File f = new File(Config.cacheDir("store"), "icon_" + cd.app.optString("id") + "_" + Integer.toHexString(url.hashCode()) + ".png");
                     try {
                         if (!url.isEmpty()) {
-                            if (!f.isFile()) {
-                                java.net.HttpURLConnection h = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
-                                h.setConnectTimeout(15000);
-                                byte[] b = Core.readAll(h.getInputStream());
-                                java.io.FileOutputStream o = new java.io.FileOutputStream(f);
-                                o.write(b);
-                                o.close();
+                            if (f.isFile()) bm = BitmapFactory.decodeFile(f.getPath());
+                            if (bm == null) {
+                                bm = iconFrom(Store.http(url, 15000));
+                                if (bm != null) {  // seulement une vraie image (pas une page d'erreur)
+                                    java.io.FileOutputStream o = new java.io.FileOutputStream(f);
+                                    bm.compress(Bitmap.CompressFormat.PNG, 100, o);
+                                    o.close();
+                                }
                             }
-                            bm = BitmapFactory.decodeFile(f.getPath());
                         }
-                    } catch (Exception ignored) {
+                    } catch (Throwable e) {
+                        ctl.log("Store : icône de " + cd.app.optString("name") + " illisible (" + fr.paradoxxx.adbpilot.Html.esc(String.valueOf(e.getMessage())) + ")", "info");
                     }
                     if (bm == null) {
                         File[] dl = Config.userDir("store").listFiles();
@@ -303,6 +311,23 @@ public final class StoreTab extends Tab {
                 }
             }
         }).start();
+    }
+
+    /** Décode une image (PNG/JPEG/WebP) réduite à 128 px maximum. */
+    static Bitmap iconFrom(byte[] b) {
+        BitmapFactory.Options o = new BitmapFactory.Options();
+        o.inJustDecodeBounds = true;
+        BitmapFactory.decodeByteArray(b, 0, b.length, o);
+        if (o.outWidth <= 0 || o.outHeight <= 0) return null;
+        int s = 1;
+        while (Math.max(o.outWidth, o.outHeight) / (s * 2) >= 128) s *= 2;
+        BitmapFactory.Options o2 = new BitmapFactory.Options();
+        o2.inSampleSize = s;
+        Bitmap bm = BitmapFactory.decodeByteArray(b, 0, b.length, o2);
+        if (bm == null) return null;
+        int m = Math.max(bm.getWidth(), bm.getHeight());
+        if (m > 128) bm = Bitmap.createScaledBitmap(bm, bm.getWidth() * 128 / m, bm.getHeight() * 128 / m, true);
+        return bm;
     }
 
     private String abi() {

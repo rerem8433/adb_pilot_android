@@ -101,16 +101,7 @@ public final class Debloat {
     }
 
     static String get(String url) throws Exception {
-        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-        c.setConnectTimeout(15000);
-        c.setReadTimeout(15000);
-        c.setRequestProperty("User-Agent", "ADBPilot-Android");
-        InputStream in = c.getInputStream();
-        try {
-            return new String(Core.readAll(in), "UTF-8");
-        } finally {
-            c.disconnect();
-        }
+        return new String(Store.http(url, 15000), "UTF-8");
     }
 
     static final String[] PROTECTED_PHONE = {

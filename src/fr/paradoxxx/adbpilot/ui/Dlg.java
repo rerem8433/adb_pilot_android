@@ -37,7 +37,7 @@ public final class Dlg {
         d.requestWindowFeature(Window.FEATURE_NO_TITLE);
         LinearLayout root = Ui.col(c);
         root.setBackground(Ui.box(Ui.BG, Ui.BORDER, 8, 1));
-        root.setPadding(dp(18), dp(14), dp(18), dp(12));
+        root.setPadding(dp(Ui.phone ? 14 : 18), dp(14), dp(Ui.phone ? 14 : 18), dp(12));
         if (title != null) {
             TextView t = Ui.bold(Ui.text(c, title, 12, Ui.TEXT));
             t.setPadding(0, 0, 0, dp(10));
@@ -49,7 +49,7 @@ public final class Dlg {
         if (w != null) {
             w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
             WindowManager.LayoutParams lp = w.getAttributes();
-            lp.width = dp(widthDp);
+            lp.width = Ui.dlgW(widthDp);
             w.setAttributes(lp);
             w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         }
@@ -65,7 +65,7 @@ public final class Dlg {
 
     public static Ui.Btn addButton(LinearLayout row, String text, String style, final Dialog d, final Ok ok) {
         Ui.Btn b = Ui.button(row.getContext(), text, style);
-        b.setMinWidth(dp(100));
+        b.setMinWidth(dp(Ui.phone ? 76 : 100));
         LinearLayout.LayoutParams lp = Ui.lp(Ui.WRAP, dp(40));
         lp.leftMargin = dp(8);
         row.addView(b, lp);
@@ -79,7 +79,7 @@ public final class Dlg {
     }
 
     public static ScrollView scroll(View v, int maxHeightDp) {
-        final int max = dp(maxHeightDp);
+        final int max = Math.min(dp(maxHeightDp), (int) (Ui.screenH() * (Ui.phone ? 0.62f : 0.75f)));
         ScrollView s = new ScrollView(v.getContext()) {
             @Override
             protected void onMeasure(int w, int h) {

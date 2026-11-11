@@ -77,19 +77,20 @@ public final class AppsTab extends Tab {
 
     public AppsTab(MainActivity m) {
         super(m);
+        final boolean ph = Ui.phone;
         stack = new FrameLayout(c);
         view = stack;
-        page = Ui.row(c);
+        page = ph ? Ui.col(c) : Ui.row(c);
         page.setGravity(Gravity.TOP);
         stack.addView(page, new FrameLayout.LayoutParams(Ui.MATCH, Ui.MATCH));
         installer = new InstallerPage(m, this);
         installer.view.setVisibility(View.GONE);
         stack.addView(installer.view, new FrameLayout.LayoutParams(Ui.MATCH, Ui.MATCH));
 
-        LinearLayout left = Ui.col(c);
+        // --- liste
         LinearLayout top = Ui.row(c);
         top.setPadding(dp(6), dp(4), dp(6), 0);
-        cbAll = new Widgets.Check(c, "Tout sélectionner").onChange(new Widgets.OnChange() {
+        cbAll = new Widgets.Check(c, ph ? "Tout" : "Tout sélectionner").onChange(new Widgets.OnChange() {
             public void changed(boolean on) {
                 selectAll(on);
             }
@@ -99,9 +100,9 @@ public final class AppsTab extends Tab {
         tot.addView(Ui.text(c, "Total :", 7, Ui.MUTED));
         lblTotal = Ui.text(c, "0", 10, Ui.TEXT);
         tot.addView(lblTotal);
-        tot.setPadding(dp(16), 0, 0, 0);
+        tot.setPadding(dp(ph ? 10 : 16), 0, ph ? dp(6) : 0, 0);
         top.addView(tot);
-        top.addView(Ui.stretch(c));
+        if (!ph) top.addView(Ui.stretch(c));
         String[][] f = {{"Toutes", "all"}, {"Système", "system"}, {"Utilisateur", "user"}, {"Désactivées", "disabled"}, {"Supprimées", "deleted"}};
         for (String[] x : f) {
             Widgets.Check rb = filters.add(c, x[0]);
@@ -115,12 +116,16 @@ public final class AppsTab extends Tab {
                 setMode(modes[i]);
             }
         });
-        left.addView(top);
 
-        cols = new Table.Cols("cols_apps", new String[]{"", "Nom de l'application", "Paquet", "Version", "Taille"},
-                new int[]{34, 280, 260, 110, 90}, new boolean[]{true, false, false, false, false},
-                new int[]{Gravity.CENTER, Gravity.START, Gravity.START, Gravity.START, Gravity.END});
-        cols.sortCol = C_NAME;
+        if (ph) {
+            cols = new Table.Cols("cols_apps_phone", new String[]{"", "Application", "Taille"}, new int[]{34, 200, 74},
+                    new boolean[]{true, false, false}, new int[]{Gravity.CENTER, Gravity.START, Gravity.END}).fill(1);
+        } else {
+            cols = new Table.Cols("cols_apps", new String[]{"", "Nom de l'application", "Paquet", "Version", "Taille"},
+                    new int[]{34, 280, 260, 110, 90}, new boolean[]{true, false, false, false, false},
+                    new int[]{Gravity.CENTER, Gravity.START, Gravity.START, Gravity.START, Gravity.END});
+        }
+        cols.sortCol = 1;  // nom de l'application dans les deux dispositions
         header = new Table.Header(c, cols, new Table.HeaderListener() {
             public void onSort(int col) {
                 sortAndShow();
@@ -130,66 +135,149 @@ public final class AppsTab extends Tab {
                 adapter.notifyDataSetChanged();
             }
         });
-        left.addView(header, Ui.lp(Ui.MATCH, Ui.WRAP));
-        list = new Table.List(c, 10, 40, 56);
+        list = ph ? new Table.List(c, 9, 54, 40) : new Table.List(c, 10, 40, 56);
         list.setAdapter(adapter);
         list.onRowSize = new Runnable() {
             public void run() {
                 adapter.notifyDataSetChanged();
             }
         };
-        left.addView(list, Ui.lpw(Ui.MATCH, 0, 1));
         metaBar = new Widgets.Bar(c).style(Ui.ACCENT_LINE, Ui.INPUT, 0, false, false);
         metaBar.setVisibility(View.GONE);
+
+        // --- actions
+        final Runnable rUpd = new Runnable() {
+            public void run() {
+                ctl.refreshPackages();
+            }
+        }, rLoad = new Runnable() {
+            public void run() {
+                loadPreset();
+            }
+        }, rSave = new Runnable() {
+            public void run() {
+                savePreset();
+            }
+        }, rPerm = new Runnable() {
+            public void run() {
+                List<Pkg> sel = selectedPkgs();
+                if (sel.isEmpty()) sel = targets();
+                if (sel.isEmpty()) {
+                    AppsTab.this.m.toast("Sélectionne une application (touche sa ligne).");
+                    return;
+                }
+                Dialogs.permissions(AppsTab.this.m, sel.get(0));
+            }
+        }, rPush = new Runnable() {
+            public void run() {
+                pushFiles();
+            }
+        }, rInst = new Runnable() {
+            public void run() {
+                showInstaller();
+            }
+        };
+        lblRam = Ui.text(c, "– / – Mo", 10, Ui.TEXT);
+        barRam = new Widgets.Bar(c).style(Ui.ACCENT_LINE, Ui.INPUT, Ui.BORDER, false, false);
+        lblSel = Ui.text(c, ph ? "0 cochée(s)" : "Sélection : 0", 10, Ui.TEXT);
+        cbWipe = new Widgets.Check(c, "Effacer aussi les données de l'appli");
+        cmbAction = new Widgets.Combo(c).items(COMBO);
+        cmbAction.select(0);
+        cmbAction.onSelect(new Widgets.Combo.OnSelect() {
+            public void selected(int i, String t) {
+                boolean on = "Désactiver".equals(t) || "Désinstaller".equals(t);
+                cbWipe.setVisibility(on ? View.VISIBLE : (ph ? View.GONE : View.INVISIBLE));
+            }
+        });
+        Ui.Btn apply = btn("Appliquer", new Runnable() {
+            public void run() {
+                applyAction();
+            }
+        });
+
+        if (ph) {
+            page.addView(Ui.hscroll(c, top), Ui.lp(Ui.MATCH, Ui.WRAP));
+            page.addView(header, Ui.lp(Ui.MATCH, Ui.WRAP));
+            page.addView(list, Ui.lpw(Ui.MATCH, 0, 1));
+            page.addView(metaBar, Ui.lp(Ui.MATCH, dp(4)));
+            LinearLayout bot = Ui.col(c);
+            bot.setPadding(dp(6), dp(4), dp(6), dp(6));
+            bot.setBackgroundColor(Ui.BG);
+            LinearLayout ram = Ui.row(c);
+            ram.addView(Ui.text(c, "RAM", 9, Ui.MUTED));
+            LinearLayout.LayoutParams rl = Ui.lpw(0, dp(8), 1);
+            rl.leftMargin = rl.rightMargin = dp(8);
+            ram.addView(barRam, rl);
+            lblRam.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, Ui.pt(9));
+            ram.addView(lblRam);
+            bot.addView(ram);
+            LinearLayout tools = Ui.row(c);
+            tools.setPadding(0, dp(5), 0, 0);
+            Ui.Btn bi = btn("Installer…", rInst);
+            tools.addView(bi, Ui.lpw(0, dp(40), 1));
+            Ui.Btn bw = btn("Debloat me =)", new Runnable() {
+                public void run() {
+                    openWizard();
+                }
+            });
+            bw.icon(Ui.icon(c, "debloat", 0), 22);
+            LinearLayout.LayoutParams wl = Ui.lpw(0, dp(40), 1.25f);
+            wl.leftMargin = wl.rightMargin = dp(4);
+            tools.addView(bw, wl);
+            final Ui.Btn more = Ui.button(c, "⋮  Plus", "btn");
+            more.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    PopupMenu pm = new PopupMenu(c, more);
+                    final String[] t = {"Mettre à jour les données", "Charger un preset", "Enregistrer le preset", "Permissions",
+                            "Envoyer des fichiers"};
+                    final Runnable[] r = {rUpd, rLoad, rSave, rPerm, rPush};
+                    for (int i = 0; i < t.length; i++) pm.getMenu().add(0, i, i, t[i]);
+                    pm.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+                        public boolean onMenuItemClick(android.view.MenuItem it) {
+                            r[it.getItemId()].run();
+                            return true;
+                        }
+                    });
+                    pm.show();
+                }
+            });
+            tools.addView(more, Ui.lpw(0, dp(40), 0.8f));
+            bot.addView(tools);
+            bot.addView(cbWipe);
+            LinearLayout act = Ui.row(c);
+            act.addView(lblSel);
+            LinearLayout.LayoutParams cl = Ui.lpw(0, dp(40), 1);
+            cl.leftMargin = dp(8);
+            act.addView(cmbAction, cl);
+            LinearLayout.LayoutParams al = Ui.lp(Ui.WRAP, dp(42));
+            al.leftMargin = dp(6);
+            apply.setPadding(dp(14), 0, dp(14), 0);
+            act.addView(apply, al);
+            bot.addView(act);
+            page.addView(bot, Ui.lp(Ui.MATCH, Ui.WRAP));
+            return;
+        }
+
+        LinearLayout left = Ui.col(c);
+        left.addView(top);
+        left.addView(header, Ui.lp(Ui.MATCH, Ui.WRAP));
+        left.addView(list, Ui.lpw(Ui.MATCH, 0, 1));
         left.addView(metaBar, Ui.lp(Ui.MATCH, dp(4)));
         page.addView(left, Ui.lpw(0, Ui.MATCH, 1));
 
         // Panneau droit
         LinearLayout right = Ui.col(c);
         right.setPadding(dp(6), dp(6), dp(6), dp(6));
-        Ui.Btn bUpd = btn("Mettre à jour les données", new Runnable() {
-            public void run() {
-                ctl.refreshPackages();
-            }
-        });
-        right.addView(bUpd, Ui.lp(Ui.MATCH, dp(42)));
-        right.addView(pair(btn("Charger un preset", new Runnable() {
-            public void run() {
-                loadPreset();
-            }
-        }), btn("Enregistrer le preset", new Runnable() {
-            public void run() {
-                savePreset();
-            }
-        })));
-        right.addView(pair(btn("Permissions", new Runnable() {
-            public void run() {
-                List<Pkg> sel = selectedPkgs();
-                if (sel.isEmpty()) sel = targets();
-                if (sel.isEmpty()) {
-                    m.toast("Sélectionne une application (touche sa ligne).");
-                    return;
-                }
-                Dialogs.permissions(m, sel.get(0));
-            }
-        }), btn("Envoyer des fichiers", new Runnable() {
-            public void run() {
-                pushFiles();
-            }
-        })));
-        right.addView(btn("Installer…", new Runnable() {
-            public void run() {
-                showInstaller();
-            }
-        }), Ui.lp(Ui.MATCH, dp(42)));
+        right.addView(btn("Mettre à jour les données", rUpd), Ui.lp(Ui.MATCH, dp(42)));
+        right.addView(pair(btn("Charger un preset", rLoad), btn("Enregistrer le preset", rSave)));
+        right.addView(pair(btn("Permissions", rPerm), btn("Envoyer des fichiers", rPush)));
+        right.addView(btn("Installer…", rInst), Ui.lp(Ui.MATCH, dp(42)));
         right.addView(Ui.space(c, 1, 10));
         LinearLayout ram = Ui.row(c);
         ram.addView(Ui.text(c, "RAM", 10, Ui.TEXT));
         ram.addView(Ui.stretch(c));
-        lblRam = Ui.text(c, "– / – Mo", 10, Ui.TEXT);
         ram.addView(lblRam);
         right.addView(ram);
-        barRam = new Widgets.Bar(c).style(Ui.ACCENT_LINE, Ui.INPUT, Ui.BORDER, false, false);
         LinearLayout.LayoutParams rl = Ui.lp(Ui.MATCH, dp(10));
         rl.topMargin = dp(4);
         right.addView(barRam, rl);
@@ -211,31 +299,23 @@ public final class AppsTab extends Tab {
         });
         right.addView(wiz, Ui.lp(Ui.MATCH, dp(72)));
         right.addView(Ui.vstretch(c));
-        lblSel = Ui.text(c, "Sélection : 0", 10, Ui.TEXT);
         lblSel.setBackground(Ui.box(0, Ui.BORDER, 0, 1));
         lblSel.setPadding(dp(6), dp(5), dp(6), dp(5));
         right.addView(lblSel, Ui.lp(Ui.MATCH, Ui.WRAP));
-        cbWipe = new Widgets.Check(c, "Effacer aussi les données de l'appli");
         right.addView(cbWipe);
         LinearLayout act = Ui.row(c);
-        cmbAction = new Widgets.Combo(c).items(COMBO);
-        cmbAction.select(0);
-        cmbAction.onSelect(new Widgets.Combo.OnSelect() {
-            public void selected(int i, String t) {
-                cbWipe.setVisibility("Désactiver".equals(t) || "Désinstaller".equals(t) ? View.VISIBLE : View.INVISIBLE);
-            }
-        });
         act.addView(cmbAction, Ui.lpw(0, dp(40), 1));
-        Ui.Btn apply = btn("Appliquer", new Runnable() {
-            public void run() {
-                applyAction();
-            }
-        });
         LinearLayout.LayoutParams al = Ui.lp(dp(96), dp(42));
         al.leftMargin = dp(6);
         act.addView(apply, al);
         right.addView(act);
         page.addView(right, Ui.lp(dp(290), Ui.MATCH));
+    }
+
+    /** Colonne affichée -> critère de tri (C_CHECK, C_NAME, C_PKG, C_VER, C_SIZE). */
+    private int logical(int col) {
+        if (!Ui.phone || col < 0) return col;
+        return new int[]{C_CHECK, C_NAME, C_SIZE}[Math.min(col, 2)];
     }
 
     private Ui.Btn btn(String t, final Runnable r) {
@@ -373,7 +453,7 @@ public final class AppsTab extends Tab {
     void sortAndShow() {
         visible.clear();
         for (Pkg p : pkgs) if (accept(p)) visible.add(p);
-        final int col = cols.sortCol;
+        final int col = logical(cols.sortCol);
         final boolean asc = cols.sortAsc;
         Collections.sort(visible, new Comparator<Pkg>() {
             public int compare(Pkg a, Pkg b) {
@@ -404,7 +484,7 @@ public final class AppsTab extends Tab {
 
     void updateCounts() {
         lblTotal.setText(String.valueOf(visible.size()));
-        lblSel.setText("Sélection : " + checked.size());
+        lblSel.setText(Ui.phone ? checked.size() + " cochée(s)" : "Sélection : " + checked.size());
         boolean all = !visible.isEmpty();
         for (Pkg p : visible) if (!checked.contains(p.name)) {
             all = false;
@@ -488,13 +568,28 @@ public final class AppsTab extends Tab {
             ic.setLayoutParams(il);
             if (p.icon != null) ic.setImageBitmap(p.icon);
             else ic.setImageDrawable(Ui.placeholder(c));
+            int col = p.deleted ? 0xffff5c5c : (p.disabled ? 0xff8a8a8e : Ui.TEXT);
+            int muted = p.deleted ? 0xffff5c5c : (p.disabled ? 0xff8a8a8e : Ui.MUTED);
+            if (Ui.phone) {
+                // 2 lignes : nom / paquet · version — taille à droite
+                LinearLayout tc = (LinearLayout) nc.getChildAt(1);
+                TextView n1 = (TextView) tc.getChildAt(0), n2 = (TextView) tc.getChildAt(1);
+                n1.setText(p.display());
+                n1.setTextColor(col);
+                n1.setTypeface(p.disabled || p.deleted ? Table.italic() : Typeface.DEFAULT);
+                n2.setText(p.version == null || p.version.isEmpty() ? p.name : p.name + "  ·  " + p.version);
+                n2.setTextColor(muted);
+                TextView sz = (TextView) row.getChildAt(2);
+                sz.setText(fmtSize(p.size));
+                sz.setTextColor(muted);
+                row.setTag(p);
+                return row;
+            }
             TextView name = (TextView) nc.getChildAt(1);
             name.setText(p.display());
-            int col = p.deleted ? 0xffff5c5c : (p.disabled ? 0xff8a8a8e : Ui.TEXT);
             name.setTextColor(col);
             name.setTypeface(p.disabled || p.deleted ? Table.italic() : Typeface.DEFAULT);
             TextView pk = (TextView) row.getChildAt(2), ver = (TextView) row.getChildAt(3), sz = (TextView) row.getChildAt(4);
-            int muted = p.deleted ? 0xffff5c5c : (p.disabled ? 0xff8a8a8e : Ui.MUTED);
             pk.setText(p.name);
             pk.setTextColor(muted);
             ver.setText(p.version == null ? "" : p.version);
@@ -522,19 +617,36 @@ public final class AppsTab extends Tab {
         });
         row.addView(cf);
         LinearLayout nc = Ui.row(c);
-        nc.setPadding(dp(8), 0, dp(4), 0);
+        nc.setPadding(dp(Ui.phone ? 4 : 8), 0, dp(4), 0);
         ImageView ic = new ImageView(c);
         ic.setScaleType(ImageView.ScaleType.FIT_CENTER);
         nc.addView(ic, Ui.lp(dp(30), dp(30)));
-        TextView name = Ui.single(Ui.text(c, "", 11, Ui.TEXT));
-        name.setPadding(dp(10), 0, 0, 0);
-        nc.addView(name, Ui.lpw(0, Ui.WRAP, 1));
-        row.addView(nc);
-        for (int i = 2; i < 5; i++) {
-            TextView t = Ui.single(Ui.text(c, "", 10, Ui.MUTED));
-            t.setGravity(Gravity.CENTER_VERTICAL | (i == C_SIZE ? Gravity.END : Gravity.START));
-            t.setPadding(dp(6), 0, dp(8), 0);
+        if (Ui.phone) {
+            LinearLayout tc = Ui.col(c);
+            tc.setPadding(dp(10), 0, 0, 0);
+            tc.setGravity(Gravity.CENTER_VERTICAL);
+            tc.addView(Ui.single(Ui.text(c, "", 11, Ui.TEXT)));
+            TextView sub = Ui.single(Ui.text(c, "", 8, Ui.MUTED));
+            sub.setEllipsize(TextUtils.TruncateAt.MIDDLE);
+            sub.setPadding(0, dp(3), 0, 0);
+            tc.addView(sub);
+            nc.addView(tc, Ui.lpw(0, Ui.WRAP, 1));
+            row.addView(nc);
+            TextView t = Ui.single(Ui.text(c, "", 9, Ui.MUTED));
+            t.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+            t.setPadding(dp(4), 0, dp(8), 0);
             row.addView(t);
+        } else {
+            TextView name = Ui.single(Ui.text(c, "", 11, Ui.TEXT));
+            name.setPadding(dp(10), 0, 0, 0);
+            nc.addView(name, Ui.lpw(0, Ui.WRAP, 1));
+            row.addView(nc);
+            for (int i = 2; i < 5; i++) {
+                TextView t = Ui.single(Ui.text(c, "", 10, Ui.MUTED));
+                t.setGravity(Gravity.CENTER_VERTICAL | (i == C_SIZE ? Gravity.END : Gravity.START));
+                t.setPadding(dp(6), 0, dp(8), 0);
+                row.addView(t);
+            }
         }
         View.OnClickListener tap = new View.OnClickListener() {
             public void onClick(View v) {

@@ -32,14 +32,14 @@ public final class NetScan {
     public static final class Found {
         public String ip;
         public int port = 0;
-        public String adb = "";   // open | auth | tls | ""
+        public String adb = "";   // open | trusted (cette tablette déjà autorisée) | auth | tls | port | ""
         public String name = "", model = "";
         public final List<String> details = new ArrayList<String>();
         public final Set<String> sources = new LinkedHashSet<String>();
 
         /** Vrai appareil ADB : il a répondu au protocole ADB (un port ouvert seul ne suffit pas). */
         public boolean connectable() {
-            return port > 0 && ("open".equals(adb) || "auth".equals(adb) || "tls".equals(adb));
+            return port > 0 && ("open".equals(adb) || "trusted".equals(adb) || "auth".equals(adb) || "tls".equals(adb));
         }
     }
 
@@ -177,6 +177,98 @@ public final class NetScan {
             return true;
         } catch (Exception e) {
             return false;
+        } finally {
+            try {
+                s.close();
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    /** Clé ADB de cette tablette / ce téléphone (pour lire le nom des appareils qui l'ont déjà autorisée). */
+    public static volatile fr.paradoxxx.adbpilot.adb.AdbCrypto key;
+
+    private static void sendMsg(OutputStream o, int cmd, int a0, int a1, byte[] data) throws java.io.IOException {
+        ByteBuffer h = ByteBuffer.allocate(24 + data.length).order(ByteOrder.LITTLE_ENDIAN);
+        int sum = 0;
+        for (byte b : data) sum += b & 0xff;
+        h.putInt(cmd).putInt(a0).putInt(a1).putInt(data.length).putInt(sum).putInt(~cmd);
+        h.put(data);
+        o.write(h.array());
+        o.flush();
+    }
+
+    /** {cmd, arg0, arg1, payload} */
+    private static Object[] readMsg(InputStream in) throws java.io.IOException {
+        byte[] head = new byte[24];
+        readFully(in, head);
+        ByteBuffer hb = ByteBuffer.wrap(head).order(ByteOrder.LITTLE_ENDIAN);
+        int cmd = hb.getInt(), a0 = hb.getInt(), a1 = hb.getInt(), len = hb.getInt();
+        if (len < 0 || len > 1 << 20) throw new java.io.IOException("message ADB invalide");
+        byte[] p = new byte[len];
+        readFully(in, p);
+        return new Object[]{cmd, a0, a1, p};
+    }
+
+    private static void readFully(InputStream in, byte[] b) throws java.io.IOException {
+        int off = 0;
+        while (off < b.length) {
+            int n = in.read(b, off, b.length - off);
+            if (n < 0) throw new java.io.IOException("connexion fermée");
+            off += n;
+        }
+    }
+
+    /**
+     * Nom donné à l'appareil (settings global device_name), seulement s'il a déjà autorisé cette tablette :
+     * le jeton d'authentification est signé une fois, la clé publique n'est jamais envoyée (donc aucune
+     * demande d'autorisation n'apparaît sur l'écran). Renvoie {"1" si autorisé sinon "", nom}.
+     */
+    public static String[] deviceName(String ip, int port, fr.paradoxxx.adbpilot.adb.AdbCrypto k) {
+        String[] none = {"", ""};
+        Socket s;
+        try {
+            s = newSocket();
+        } catch (java.io.IOException e) {
+            return none;
+        }
+        try {
+            s.connect(new InetSocketAddress(ip, port), 1500);
+            s.setSoTimeout(2000);
+            OutputStream o = s.getOutputStream();
+            InputStream in = s.getInputStream();
+            sendMsg(o, 0x4E584E43, 0x01000001, 256 * 1024, "host::\0".getBytes("UTF-8"));
+            boolean signed = false;
+            while (true) {
+                Object[] m = readMsg(in);
+                int cmd = (Integer) m[0];
+                if (cmd == 0x48545541) {  // AUTH
+                    if (signed || k == null || (Integer) m[1] != 1) return none;
+                    sendMsg(o, 0x48545541, 2, 0, k.sign((byte[]) m[3]));
+                    signed = true;
+                } else if (cmd == 0x4E584E43) {  // CNXN : autorisé
+                    break;
+                } else return none;
+            }
+            sendMsg(o, 0x4E45504F, 1, 0, "shell:settings get global device_name\0".getBytes("UTF-8"));
+            StringBuilder out = new StringBuilder();
+            int remote = 0;
+            long end = System.currentTimeMillis() + 3000;
+            while (System.currentTimeMillis() < end) {
+                Object[] m = readMsg(in);
+                int cmd = (Integer) m[0];
+                if (cmd == 0x59414B4F) remote = (Integer) m[1];  // OKAY
+                else if (cmd == 0x45545257) {  // WRTE
+                    remote = (Integer) m[1];
+                    out.append(new String((byte[]) m[3], "UTF-8"));
+                    sendMsg(o, 0x59414B4F, 1, remote, new byte[0]);
+                } else if (cmd == 0x45534C43) break;  // CLSE
+            }
+            String n = out.toString().trim();
+            boolean bad = n.isEmpty() || n.equalsIgnoreCase("null") || n.contains("\n") || n.length() > 64;
+            return new String[]{"1", bad ? "" : n};
+        } catch (Exception e) {
+            return none;
         } finally {
             try {
                 s.close();
@@ -499,11 +591,21 @@ public final class NetScan {
                         }
                     } catch (Exception ignored) {
                     }
+                    String devName = "";
+                    if (f.port > 0 && ("open".equals(f.adb) || "auth".equals(f.adb))) {
+                        String[] dn = deviceName(f.ip, f.port, key);
+                        if ("1".equals(dn[0]) && "auth".equals(f.adb)) f.adb = "trusted";
+                        devName = dn[1];
+                    }
+                    String cast = f.sources.contains("cast") || f.sources.contains("atv") ? f.name : "";
                     String hist = known.get(f.ip);
-                    if (!f.model.isEmpty()) f.name = f.model;
-                    else if (hist != null) f.name = hist;
-                    else if (f.name.isEmpty())
-                        f.name = f.sources.contains("dns") && !f.details.isEmpty() ? f.details.get(f.details.size() - 1) : f.ip;
+                    String dns = f.sources.contains("dns") && !f.details.isEmpty() ? f.details.get(f.details.size() - 1) : "";
+                    String[] prio = {devName, cast, hist, f.model, f.name, dns, f.ip};
+                    for (String x : prio) if (x != null && !x.isEmpty()) {
+                        f.name = x;
+                        break;
+                    }
+                    if (!f.model.isEmpty() && !f.model.equals(f.name) && !f.details.contains(f.model)) f.details.add(0, f.model);
                 }
             }));
         }
@@ -527,7 +629,7 @@ public final class NetScan {
     }
 
     static int order(String s) {
-        return "open".equals(s) ? 0 : "auth".equals(s) ? 1 : "tls".equals(s) ? 2 : "port".equals(s) ? 3 : 4;
+        return "open".equals(s) || "trusted".equals(s) ? 0 : "auth".equals(s) ? 1 : "tls".equals(s) ? 2 : "port".equals(s) ? 3 : 4;
     }
 
     public static long ipKey(String ip) {

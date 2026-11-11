@@ -20,23 +20,29 @@ import static fr.paradoxxx.adbpilot.ui.Ui.dp;
 /** Paramètres (settings_tab.py). */
 public final class SettingsTab extends Tab {
     private TextView keyLbl;
+    private final int LBL = Ui.phone ? 112 : 130;
 
     public SettingsTab(MainActivity m) {
         super(m);
         ScrollView sc = new ScrollView(c);
-        LinearLayout body = Ui.row(c);
+        LinearLayout body = Ui.phone ? Ui.col(c) : Ui.row(c);
         body.setGravity(Gravity.TOP);
-        body.setPadding(dp(12), dp(4), dp(12), dp(12));
+        body.setPadding(dp(Ui.phone ? 8 : 12), dp(4), dp(Ui.phone ? 8 : 12), dp(12));
         sc.addView(body);
         view = sc;
         LinearLayout c1 = Ui.col(c), c2 = Ui.col(c);
-        body.addView(c1, Ui.lpw(0, Ui.WRAP, 1));
-        body.addView(Ui.space(c, 12, 1));
-        body.addView(c2, Ui.lpw(0, Ui.WRAP, 1));
+        if (Ui.phone) {  // une seule colonne
+            body.addView(c1, Ui.lp(Ui.MATCH, Ui.WRAP));
+            body.addView(c2, Ui.lp(Ui.MATCH, Ui.WRAP));
+        } else {
+            body.addView(c1, Ui.lpw(0, Ui.WRAP, 1));
+            body.addView(Ui.space(c, 12, 1));
+            body.addView(c2, Ui.lpw(0, Ui.WRAP, 1));
+        }
 
         LinearLayout g = Ui.group(c, "Outils", c1);
         g.addView(Ui.html(c, "adb : <font color='#2fd06b'>protocole ADB intégré</font> (Wi-Fi et USB OTG, sans serveur adb)<br>"
-                + "scrcpy : <font color='#2fd06b'>serveur v3.3.4 intégré</font> (décodage matériel de la tablette)<br>"
+                + "scrcpy : <font color='#2fd06b'>serveur v3.3.4 intégré</font> (décodage matériel de " + (Ui.phone ? "ce téléphone" : "cette tablette") + ")<br>"
                 + "fastboot : USB OTG uniquement", 9, Ui.TEXT));
         keyLbl = Ui.text(c, "", 8, Ui.MUTED);
         keyLbl.setPadding(0, dp(6), 0, 0);
@@ -94,7 +100,7 @@ public final class SettingsTab extends Tab {
         check(g, "Garder l'appareil éveillé", "scrcpy_stay_awake", true);
         check(g, "Afficher les touches", "scrcpy_show_touches", false);
         LinearLayout cr = Ui.row(c);
-        cr.addView(Ui.text(c, "Codec vidéo : ", 10, Ui.TEXT), Ui.lp(dp(130), Ui.WRAP));
+        cr.addView(Ui.text(c, "Codec vidéo : ", 10, Ui.TEXT), Ui.lp(dp(LBL), Ui.WRAP));
         final String[] cods = {"h264", "h265"};
         Widgets.Combo codec = new Widgets.Combo(c).items("H.264 (compatible)", "H.265 (moins de débit)");
         codec.select("h265".equals(Config.getStr("scrcpy_codec", "h264")) ? 1 : 0);
@@ -108,16 +114,16 @@ public final class SettingsTab extends Tab {
 
         g = Ui.group(c, "Interface", c2);
         LinearLayout lr = Ui.row(c);
-        lr.addView(Ui.text(c, "Langue : ", 10, Ui.TEXT), Ui.lp(dp(130), Ui.WRAP));
+        lr.addView(Ui.text(c, "Langue : ", 10, Ui.TEXT), Ui.lp(dp(LBL), Ui.WRAP));
         lr.addView(new Widgets.Combo(c).items("Français"), Ui.lpw(0, dp(36), 1));
         g.addView(lr);
         LinearLayout tr = Ui.row(c);
-        tr.addView(Ui.text(c, "Thème : ", 10, Ui.TEXT), Ui.lp(dp(130), Ui.WRAP));
+        tr.addView(Ui.text(c, "Thème : ", 10, Ui.TEXT), Ui.lp(dp(LBL), Ui.WRAP));
         tr.addView(new Widgets.Combo(c).items("Sombre"), Ui.lpw(0, dp(36), 1));
         tr.setPadding(0, dp(4), 0, 0);
         g.addView(tr);
         LinearLayout fr = Ui.row(c);
-        fr.addView(Ui.text(c, "Taille du texte : ", 10, Ui.TEXT), Ui.lp(dp(130), Ui.WRAP));
+        fr.addView(Ui.text(c, "Taille du texte : ", 10, Ui.TEXT), Ui.lp(dp(LBL), Ui.WRAP));
         fr.setPadding(0, dp(4), 0, 0);
         final String[] scales = {"90", "100", "115", "130"};
         Widgets.Combo fs = new Widgets.Combo(c).items("Petite", "Normale", "Grande", "Très grande");
@@ -131,6 +137,22 @@ public final class SettingsTab extends Tab {
         });
         fr.addView(fs, Ui.lpw(0, dp(36), 1));
         g.addView(fr);
+        LinearLayout dr = Ui.row(c);
+        dr.addView(Ui.text(c, "Disposition : ", 10, Ui.TEXT), Ui.lp(dp(LBL), Ui.WRAP));
+        dr.setPadding(0, dp(4), 0, 0);
+        final String[] lays = {"auto", "phone", "tablet"};
+        Widgets.Combo ly = new Widgets.Combo(c).items("Automatique (" + (Ui.isSmallScreen(c) ? "smartphone" : "tablette") + ")",
+                "Smartphone", "Tablette");
+        int li = java.util.Arrays.asList(lays).indexOf(Config.getStr("layout", "auto"));
+        ly.select(li < 0 ? 0 : li);
+        ly.onSelect(new Widgets.Combo.OnSelect() {
+            public void selected(int i, String t) {
+                Config.setStr("layout", lays[i]);
+                SettingsTab.this.m.toast("Disposition appliquée au prochain démarrage d'ADB Pilot.", 4000);
+            }
+        });
+        dr.addView(ly, Ui.lpw(0, dp(36), 1));
+        g.addView(dr);
         field(g, "Captures d'écran :", "screens_dir", "", false).setHint(Config.userDir("images").getAbsolutePath());
         field(g, "APK à installer :", "install_dir", "", false).setHint(Config.userDir("install").getAbsolutePath());
 
@@ -149,7 +171,7 @@ public final class SettingsTab extends Tab {
 
     @Override
     public void onShown() {
-        keyLbl.setText("Clé ADB de la tablette (empreinte affichée par Android lors de l'autorisation) :\n" + ctl.keyFingerprint());
+        keyLbl.setText("Clé ADB " + (Ui.phone ? "du téléphone" : "de la tablette") + " (empreinte affichée par Android lors de l'autorisation) :\n" + ctl.keyFingerprint());
     }
 
     private Widgets.Check check(LinearLayout g, String text, final String key, boolean def) {
@@ -167,7 +189,7 @@ public final class SettingsTab extends Tab {
     private EditText field(LinearLayout g, String label, final String key, String def, boolean number) {
         LinearLayout r = Ui.row(c);
         r.setPadding(0, dp(3), 0, dp(3));
-        r.addView(Ui.text(c, label, 10, Ui.TEXT), Ui.lp(dp(130), Ui.WRAP));
+        r.addView(Ui.text(c, label, 10, Ui.TEXT), Ui.lp(dp(LBL), Ui.WRAP));
         EditText e = Ui.edit(c, "");
         if (number) e.setInputType(InputType.TYPE_CLASS_NUMBER);
         e.setText(Config.getStr(key, def));

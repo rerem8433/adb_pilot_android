@@ -102,7 +102,16 @@ public final class ProgressOverlay extends FrameLayout {
         bot.addView(btn, Ui.lp(dp(130), dp(36)));
         bot.setPadding(0, dp(8), 0, 0);
         card.addView(bot);
+        if (Ui.phone) card.setPadding(dp(16), dp(16), dp(16), dp(14));
         addView(card, new LayoutParams(dp(520), Ui.WRAP, Gravity.CENTER));
+    }
+
+    @Override
+    protected void onMeasure(int wm, int hm) {
+        LayoutParams lp = (LayoutParams) card.getLayoutParams();
+        int w = Math.min(dp(520), MeasureSpec.getSize(wm) - dp(Ui.phone ? 16 : 32));
+        if (lp.width != w && w > 0) lp.width = w;
+        super.onMeasure(wm, hm);
     }
 
     @Override

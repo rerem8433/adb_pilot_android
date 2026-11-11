@@ -91,7 +91,7 @@ public final class Dialogs {
                 for (String[] r : rows) {
                     LinearLayout row = Ui.row(m);
                     row.setGravity(Gravity.TOP);
-                    row.addView(Ui.text(m, r[0] + " :", 10, Ui.MUTED), Ui.lp(dp(140), Ui.WRAP));
+                    row.addView(Ui.text(m, r[0] + " :", 10, Ui.MUTED), Ui.lp(dp(Ui.phone ? 100 : 140), Ui.WRAP));
                     TextView v = Ui.text(m, empty(r[1]) ? "–" : r[1], 10, Ui.TEXT);
                     v.setTextIsSelectable(true);
                     row.addView(v, Ui.lpw(0, Ui.WRAP, 1));
@@ -275,7 +275,7 @@ public final class Dialogs {
         final Context c = m;
         final Dialog d = new Dialog(c);
         d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
-        LinearLayout root = Ui.row(c);
+        LinearLayout root = Ui.phone ? Ui.col(c) : Ui.row(c);
         root.setGravity(Gravity.TOP);
         LinearLayout side = Ui.col(c);
         side.setBackgroundColor(0xff1e3a7b);
@@ -309,7 +309,7 @@ public final class Dialogs {
         TextView v = Ui.text(c, "Listes ADB Pilot (debloat0-3)", 7, 0xffc8d4f0);
         v.setGravity(Gravity.CENTER);
         side.addView(v, Ui.lp(Ui.MATCH, Ui.WRAP));
-        root.addView(side, Ui.lp(dp(200), Ui.MATCH));
+        root.addView(side, Ui.phone ? Ui.lp(Ui.MATCH, dp(196)) : Ui.lp(dp(200), Ui.MATCH));
 
         LinearLayout main = Ui.col(c);
         main.setBackgroundColor(0xffffffff);
@@ -336,7 +336,12 @@ public final class Dialogs {
         okr.setGravity(Gravity.CENTER);
         okr.addView(ok, Ui.lp(dp(160), dp(40)));
         main.addView(okr, Ui.lp(Ui.MATCH, Ui.WRAP));
-        root.addView(main, Ui.lpw(0, Ui.MATCH, 1));
+        if (Ui.phone) {
+            android.widget.ScrollView ms = new android.widget.ScrollView(c);
+            ms.setBackgroundColor(0xffffffff);
+            ms.addView(main);
+            root.addView(ms, Ui.lpw(Ui.MATCH, 0, 1));
+        } else root.addView(main, Ui.lpw(0, Ui.MATCH, 1));
 
         slider.onChange = new Runnable() {
             public void run() {
@@ -359,12 +364,13 @@ public final class Dialogs {
                 cb.level(slider.value);
             }
         });
-        d.setContentView(root, new android.view.ViewGroup.LayoutParams(dp(600), dp(400)));
+        int dw = Ui.dlgW(600), dh = Ui.phone ? Math.min(dp(640), Ui.screenH() - dp(56)) : Math.min(dp(400), Ui.screenH() - dp(24));
+        d.setContentView(root, new android.view.ViewGroup.LayoutParams(dw, dh));
         if (d.getWindow() != null) {
             d.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
             android.view.WindowManager.LayoutParams lp = d.getWindow().getAttributes();
-            lp.width = dp(600);
-            lp.height = dp(400);
+            lp.width = dw;
+            lp.height = dh;
             d.getWindow().setAttributes(lp);
         }
         d.show();
@@ -373,5 +379,34 @@ public final class Dialogs {
     @SuppressWarnings("unused")
     private static List<String> keys(Map<String, ?> m) {
         return new ArrayList<String>(m.keySet());
+    }
+
+    // ------------------------------------------------------------------ à quoi sert l'appli
+    /** Avertissement « ADB Pilot pilote un AUTRE appareil » (premier lancement + onglet À propos). */
+    public static String targetNoticeHtml() {
+        String me = Ui.phone ? "ce téléphone" : "cette tablette";
+        return "<b>ADB Pilot ne sert pas à nettoyer " + me + ".</b><br><br>"
+                + "Comme la version PC, il pilote <b>un autre appareil</b> auquel il se connecte (box, TV, téléphone…), "
+                + "en Wi-Fi ou par câble OTG : " + me + " joue le rôle du PC, c'est la « télécommande », pas la cible.<br><br>"
+                + "C'est l'inverse de l'application Android d'ADB AppControl, qui gère l'appareil sur lequel elle est installée. "
+                + "Pour débloater " + me + ", utilise ADB Pilot depuis un PC ou un autre appareil Android.";
+    }
+
+    /** Affiché une seule fois, au premier lancement. */
+    public static void targetNoticeOnce(final MainActivity m) {
+        if (fr.paradoxxx.adbpilot.Config.getBool("notice_target_seen", false)) return;
+        TextView t = Ui.html(m, targetNoticeHtml(), 10, Ui.TEXT);
+        LinearLayout body = Ui.col(m);
+        body.addView(Dlg.scroll(t, 420), Ui.lp(Ui.MATCH, Ui.WRAP));
+        LinearLayout br = Dlg.buttons(m);
+        body.addView(br, Ui.lp(Ui.MATCH, Ui.WRAP));
+        final android.app.Dialog d = Dlg.make(m, "⚠  À savoir avant de commencer", body, 520);
+        Dlg.addButton(br, "J'ai compris", "accent", d, new Dlg.Ok() {
+            public void ok() {
+                fr.paradoxxx.adbpilot.Config.setBool("notice_target_seen", true);
+            }
+        });
+        d.setCancelable(false);
+        d.show();
     }
 }

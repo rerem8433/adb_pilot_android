@@ -180,6 +180,15 @@ public final class Controller {
         }
     }
 
+    /** Clé ADB de cette tablette, ou null si elle n'a pas encore pu être créée. */
+    public AdbCrypto keyOrNull() {
+        try {
+            return crypto();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private synchronized AdbCrypto crypto() throws Exception {
         if (crypto == null) {
             String name = "adbpilot@" + (Build.MODEL == null ? "android" : Build.MODEL.replace(' ', '_'));
@@ -498,6 +507,12 @@ public final class Controller {
                 if (r == null || current != d) return;
                 lastInfo = (Map<String, String>) r[0];
                 lastSpecs = (Map<String, Object>) r[1];
+                String dn = lastInfo.get("device_name");
+                if (dn != null && !dn.isEmpty() && d.isNetwork()) {  // resservira aux prochaines détections
+                    Map<String, String> names = Config.getMap("ip_names");
+                    names.put(d.serial.split(":")[0], dn);
+                    Config.setMap("ip_names", names);
+                }
                 ui.info(lastInfo, lastSpecs);
             }
         });

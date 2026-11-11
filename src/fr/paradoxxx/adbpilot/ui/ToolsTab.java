@@ -145,9 +145,10 @@ public final class ToolsTab extends Tab {
 
     public ToolsTab(MainActivity m) {
         super(m);
-        LinearLayout lay = Ui.row(c);
+        final boolean ph = Ui.phone;
+        LinearLayout lay = ph ? Ui.col(c) : Ui.row(c);
         lay.setPadding(dp(10), dp(10), dp(10), dp(10));
-        lay.setGravity(Gravity.CENTER_VERTICAL);
+        lay.setGravity(ph ? Gravity.CENTER_HORIZONTAL : Gravity.CENTER_VERTICAL);
         ScrollView sv = new ScrollView(c);
         LinearLayout info = Ui.col(c);
         info.setBackground(Ui.box(0, Ui.BORDER, 0, 1));
@@ -155,22 +156,24 @@ public final class ToolsTab extends Tab {
         lblInfo = Ui.text(c, "Aucun appareil", 10, Ui.TEXT);
         lblInfo.setTextIsSelectable(true);
         info.addView(lblInfo);
-        sv.addView(info);
-        LinearLayout ic = Ui.col(c);
-        ic.addView(sv, Ui.lp(dp(220), Ui.WRAP));
-        ic.addView(Ui.vstretch(c));
-        lay.addView(ic, Ui.lp(dp(220), Ui.MATCH));
-        lay.addView(Ui.stretch(c));
-        ScrollView rs = new ScrollView(c);
         FrameLayout rf = new FrameLayout(c);
         rf.addView(new Remote(c), new FrameLayout.LayoutParams(Ui.WRAP, Ui.WRAP, Gravity.CENTER));
-        rs.addView(rf);
-        lay.addView(rs, Ui.lp(dp(210), Ui.MATCH));
-        lay.addView(Ui.space(c, 40, 1));
+        if (!ph) {
+            sv.addView(info);
+            LinearLayout ic = Ui.col(c);
+            ic.addView(sv, Ui.lp(dp(220), Ui.WRAP));
+            ic.addView(Ui.vstretch(c));
+            lay.addView(ic, Ui.lp(dp(220), Ui.MATCH));
+            lay.addView(Ui.stretch(c));
+            ScrollView rs = new ScrollView(c);
+            rs.addView(rf);
+            lay.addView(rs, Ui.lp(dp(210), Ui.MATCH));
+            lay.addView(Ui.space(c, 40, 1));
+        }
 
         LinearLayout rcol = Ui.col(c);
         rcol.setGravity(Gravity.CENTER_HORIZONTAL);
-        rcol.addView(Ui.vstretch(c));
+        if (!ph) rcol.addView(Ui.vstretch(c));
         lblScrcpy = Ui.html(c, "<font color='#2fd06b'>scrcpy v3.3.4 intégré</font>", 10, Ui.TEXT);
         lblScrcpy.setGravity(Gravity.CENTER);
         rcol.addView(lblScrcpy);
@@ -221,7 +224,19 @@ public final class ToolsTab extends Tab {
         LinearLayout.LayoutParams pl = Ui.lp(dp(180), dp(38));
         pl.topMargin = dp(16);
         rcol.addView(pair, pl);
-        rcol.addView(Ui.vstretch(c));
+        if (!ph) rcol.addView(Ui.vstretch(c));
+        if (ph) {
+            rcol.setPadding(0, 0, 0, dp(14));
+            lay.addView(rcol, Ui.lp(Ui.MATCH, Ui.WRAP));
+            lay.addView(rf, Ui.lp(Ui.MATCH, Ui.WRAP));
+            TextView it = Ui.bold(Ui.text(c, "Appareil", 10, Ui.MUTED));
+            it.setPadding(dp(2), dp(16), 0, dp(4));
+            lay.addView(it, Ui.lp(Ui.MATCH, Ui.WRAP));
+            lay.addView(info, Ui.lp(Ui.MATCH, Ui.WRAP));
+            sv.addView(lay);
+            view = sv;
+            return;
+        }
         lay.addView(rcol, Ui.lp(Ui.WRAP, Ui.MATCH));
         lay.addView(Ui.stretch(c));
         view = lay;
@@ -277,7 +292,7 @@ public final class ToolsTab extends Tab {
         }
         String brand = i.get("brand") != null && !i.get("brand").isEmpty() ? i.get("brand") : i.get("manufacturer");
         StringBuilder sb = new StringBuilder("<big><b>" + Html.esc(brand) + "</b></big><br><br>");
-        String[][] rows = {{"Modèle", i.get("model")}, {"N° de série", i.get("serial")}, {"Processeur", cpu},
+        String[][] rows = {{"Nom de l'appareil", i.get("device_name")}, {"Modèle", i.get("model")}, {"N° de série", i.get("serial")}, {"Processeur", cpu},
                 {"Mémoire", android.text.TextUtils.join("\n", mem)}, {"Stockage utilisateur", stor}, {"Écran", screen},
                 {"ABI", i.get("abi")}, {"Android", andr}, {"ROM", i.get("build")}};
         for (String[] r : rows) {

@@ -42,12 +42,13 @@ public final class ScanPanel extends LinearLayout {
         this.connect = connect;
         setOrientation(VERTICAL);
         setBackground(Ui.box(0xff2f2f33, Ui.ACCENT_LINE, 12, 1.5f));
-        setPadding(dp(16), dp(14), dp(16), dp(12));
+        if (Ui.phone) setPadding(dp(10), dp(10), dp(10), dp(10));
+        else setPadding(dp(16), dp(14), dp(16), dp(12));
         setElevation(dp(14));
         setClickable(true);
         setVisibility(GONE);
         LinearLayout top = Ui.row(c);
-        top.addView(Ui.bold(Ui.text(c, "Appareils Android sur le réseau", 12, Ui.TEXT)));
+        top.addView(Ui.bold(Ui.text(c, Ui.phone ? "Appareils sur le réseau" : "Appareils Android sur le réseau", 12, Ui.TEXT)));
         top.addView(Ui.stretch(c));
         again = Ui.button(c, "Relancer", "btn");
         again.setOnClickListener(new OnClickListener() {
@@ -74,11 +75,13 @@ public final class ScanPanel extends LinearLayout {
         LinearLayout.LayoutParams hl = Ui.lp(Ui.MATCH, Ui.WRAP);
         hl.topMargin = dp(8);
         addView(hdr, hl);
+        if (Ui.phone) hdr.setVisibility(GONE);  // lignes sur 2 niveaux, sans colonnes
         table = Ui.col(c);
         ScrollView sv = new ScrollView(c) {
             @Override
             protected void onMeasure(int wm, int hm) {
-                super.onMeasure(wm, MeasureSpec.makeMeasureSpec(dp(46 * 7), MeasureSpec.AT_MOST));
+                int max = Ui.phone ? (int) (Ui.screenH() * 0.55f) : dp(46 * 7);
+                super.onMeasure(wm, MeasureSpec.makeMeasureSpec(max, MeasureSpec.AT_MOST));
             }
         };
         sv.addView(table);
@@ -110,7 +113,7 @@ public final class ScanPanel extends LinearLayout {
         if (!NetScan.bindToLan(getContext())) {
             running = false;
             again.setEnabled(true);
-            sub.setText("Pas de réseau Wi-Fi ou Ethernet : connecte la tablette au même réseau que les appareils.");
+            sub.setText("Pas de réseau Wi-Fi ou Ethernet : connecte " + Ui.self() + " au même réseau que les appareils.");
             fill(new ArrayList<NetScan.Found>(), false);
             empty.setText("Le scan n'est pas lancé sur les données mobiles (il analyserait le réseau de l'opérateur, pas ta maison).");
             empty.setVisibility(VISIBLE);
@@ -130,6 +133,7 @@ public final class ScanPanel extends LinearLayout {
         String ps = Config.getStr("port", "auto");
         final int port = ps.matches("\\d+") ? Integer.parseInt(ps) : 5555;
         final Map<String, String> names = Config.getMap("ip_names");
+        NetScan.key = ctl.keyOrNull();
         final long t0 = System.currentTimeMillis();
         new Thread(new Runnable() {
             public void run() {
@@ -199,8 +203,11 @@ public final class ScanPanel extends LinearLayout {
             if ("open".equals(f.adb)) {
                 lab = "ADB ouvert";
                 col = Ui.GREEN;
+            } else if ("trusted".equals(f.adb)) {
+                lab = Ui.phone ? "ADB · ce téléphone est déjà autorisé" : "ADB · cette tablette est déjà autorisée";
+                col = Ui.GREEN;
             } else if ("auth".equals(f.adb)) {
-                lab = partial ? "Port ADB ouvert…" : "ADB actif · autorisation à accepter sur l'écran";
+                lab = partial ? "Port ADB ouvert…" : (Ui.phone ? "ADB actif · autorisation à accepter" : "ADB actif · autorisation à accepter sur l'écran");
                 col = partial ? Ui.MUTED : 0xff7fa4ff;
             } else if ("tls".equals(f.adb)) {
                 lab = "Débogage sans fil (Android 11+)";
@@ -211,6 +218,10 @@ public final class ScanPanel extends LinearLayout {
             } else {
                 lab = "ADB fermé";
                 col = 0xff77777b;
+            }
+            if (Ui.phone) {
+                phoneRow(f, r, can, lab, col, curIp);
+                continue;
             }
             LinearLayout row = Ui.row(c);
             row.setBackgroundColor(r % 2 == 0 ? Ui.ROW : Ui.ROW_ALT);
@@ -258,9 +269,58 @@ public final class ScanPanel extends LinearLayout {
             table.addView(row, Ui.lp(Ui.MATCH, dp(46)));
         }
         if (rows.isEmpty() && !running) {
-            empty.setText("Aucun appareil trouvé. Vérifie que le débogage ADB réseau est activé sur l'appareil et qu'il est sur le même réseau que la tablette.");
+            empty.setText("Aucun appareil trouvé. Vérifie que le débogage ADB réseau est activé sur l'appareil et qu'il est sur le même réseau que " + Ui.self() + ".");
             empty.setVisibility(VISIBLE);
         } else empty.setVisibility(GONE);
+    }
+
+    /** Smartphone : nom + détails, puis IP:port · état ; bouton Connecter à droite. */
+    private void phoneRow(final NetScan.Found f, int r, boolean can, String lab, int col, String curIp) {
+        Context c = getContext();
+        LinearLayout row = Ui.row(c);
+        row.setBackgroundColor(r % 2 == 0 ? Ui.ROW : Ui.ROW_ALT);
+        row.setPadding(dp(8), dp(6), dp(6), dp(6));
+        String name = f.name.isEmpty() ? f.ip : f.name;
+        LinkedHashSet<String> extra = new LinkedHashSet<String>();
+        for (String d : f.details) if (d != null && !d.isEmpty() && !d.equals(name)) extra.add(d);
+        StringBuilder ex = new StringBuilder();
+        for (String e : extra) ex.append(ex.length() > 0 ? " · " : "").append(e);
+        LinearLayout tc = Ui.col(c);
+        tc.addView(Ui.single(Ui.bold(Ui.text(c, name, 10, can ? Ui.TEXT : 0xff77777b))));
+        if (ex.length() > 0) {
+            TextView d = Ui.single(Ui.text(c, ex.toString(), 8, Ui.MUTED));
+            d.setPadding(0, dp(2), 0, 0);
+            tc.addView(d);
+        }
+        TextView ipl = Ui.single(Ui.text(c, f.ip + (f.port > 0 ? ":" + f.port : ""), 9, can ? 0xffdcdcdc : 0xff77777b));
+        ipl.setTypeface(android.graphics.Typeface.MONOSPACE);
+        ipl.setPadding(0, dp(3), 0, 0);
+        tc.addView(ipl);
+        TextView st = Ui.single(Ui.text(c, (can ? "● " : "○ ") + lab, 8, col));
+        st.setPadding(0, dp(2), 0, 0);
+        tc.addView(st);
+        row.addView(tc, Ui.lpw(0, Ui.WRAP, 1));
+        if (can) {
+            boolean connected = f.ip.equals(curIp);
+            Ui.Btn b = Ui.button(c, connected ? "Connecté" : "Connecter", "accent");
+            b.setPadding(dp(10), 0, dp(10), 0);
+            b.setEnabled(!connected);
+            b.setOnClickListener(new OnClickListener() {
+                public void onClick(View v) {
+                    pick(f);
+                }
+            });
+            LinearLayout.LayoutParams bl = Ui.lp(Ui.WRAP, dp(40));
+            bl.leftMargin = dp(6);
+            row.addView(b, bl);
+            row.setClickable(true);
+            row.setOnClickListener(new OnClickListener() {
+                public void onClick(View v) {
+                    pick(f);
+                }
+            });
+        }
+        table.addView(row, Ui.lp(Ui.MATCH, Ui.WRAP));
     }
 
     private void pick(NetScan.Found f) {

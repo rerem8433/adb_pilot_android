@@ -72,14 +72,27 @@ public final class ConsoleTab extends Tab {
         out.setLineSpacing(0, 1.1f);
         sv.addView(out);
         top.addView(sv, Ui.lpw(0, Ui.MATCH, 1));
-        LinearLayout side = Ui.col(c);
-        side.setPadding(dp(6), 0, 0, 0);
+        final boolean ph = Ui.phone;
+        LinearLayout side = ph ? Ui.row(c) : Ui.col(c);
+        side.setPadding(ph ? 0 : dp(6), 0, 0, ph ? dp(6) : 0);
         bLogcat = Ui.button(c, "Logcat", "btn").checkable();
         bShell = Ui.button(c, "Shell", "btn").checkable();
-        Ui.Btn[] bs = {Ui.button(c, "Copier\nle journal", "btn"), Ui.button(c, "Effacer\nla console", "btn"), bLogcat, bShell,
+        // même ordre dans les deux dispositions (les écouteurs ci-dessous utilisent les indices)
+        Ui.Btn[] bs = ph ? new Ui.Btn[]{Ui.button(c, "Copier", "btn"), Ui.button(c, "Effacer", "btn"), bLogcat, bShell,
+                Ui.button(c, "Partager", "btn"), Ui.button(c, "Ctrl+C", "btn")}
+                : new Ui.Btn[]{Ui.button(c, "Copier\nle journal", "btn"), Ui.button(c, "Effacer\nla console", "btn"), bLogcat, bShell,
                 Ui.button(c, "Partager\nle journal", "btn"), Ui.button(c, "Ctrl+C\n(stop)", "btn")};
         LinearLayout r = null;
-        for (int i = 0; i < bs.length; i++) {
+        if (ph) {
+            Ui.Btn[] order = {bShell, bLogcat, bs[5], bs[0], bs[1], bs[4]};
+            for (Ui.Btn b : order) {
+                b.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, Ui.pt(9));
+                b.setPadding(dp(12), 0, dp(12), 0);
+                LinearLayout.LayoutParams bl = Ui.lp(Ui.WRAP, dp(36));
+                bl.rightMargin = dp(4);
+                side.addView(b, bl);
+            }
+        } else for (int i = 0; i < bs.length; i++) {
             if (i % 2 == 0) {
                 r = Ui.row(c);
                 side.addView(r);
@@ -121,7 +134,12 @@ public final class ConsoleTab extends Tab {
                 interrupt();
             }
         });
-        top.addView(side, Ui.lp(Ui.WRAP, Ui.MATCH));
+        if (ph) {
+            android.widget.HorizontalScrollView hs = Ui.hscroll(c, side);
+            hs.setFillViewport(false);
+            lay.addView(hs, Ui.lp(Ui.MATCH, Ui.WRAP));
+            out.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, Ui.pt(8.5f));
+        } else top.addView(side, Ui.lp(Ui.WRAP, Ui.MATCH));
         lay.addView(top, Ui.lpw(Ui.MATCH, 0, 1));
 
         LinearLayout row = Ui.row(c);
@@ -179,7 +197,8 @@ public final class ConsoleTab extends Tab {
                 enter();
             }
         });
-        row.addView(ent, Ui.lp(dp(110), dp(42)));
+        if (ph) ent.setPadding(dp(10), 0, dp(10), 0);
+        row.addView(ent, Ui.lp(ph ? Ui.WRAP : dp(110), dp(42)));
         lay.addView(row);
 
         LinearLayout bot = Ui.row(c);
@@ -192,8 +211,11 @@ public final class ConsoleTab extends Tab {
             }
         });
         bot.addView(bFastboot, Ui.lp(Ui.WRAP, dp(30)));
-        bot.addView(Ui.stretch(c));
-        bot.addView(Ui.text(c, "Commandes rapides ", 10, Ui.TEXT));
+        if (ph) bot.addView(Ui.space(c, 6, 1));
+        else {
+            bot.addView(Ui.stretch(c));
+            bot.addView(Ui.text(c, "Commandes rapides ", 10, Ui.TEXT));
+        }
         Ui.Btn add = Ui.button(c, "+", "btn");
         add.setPadding(0, 0, 0, 0);
         add.setOnClickListener(new View.OnClickListener() {
@@ -232,7 +254,11 @@ public final class ConsoleTab extends Tab {
             }
         });
         fillFast();
-        bot.addView(fast, Ui.lp(dp(320), dp(34)));
+        if (ph) {
+            fast.setHint("Commandes rapides");
+            fast.setHintTextColor(Ui.MUTED);
+        }
+        bot.addView(fast, ph ? Ui.lpw(0, dp(36), 1) : Ui.lp(dp(320), dp(34)));
         lay.addView(bot);
         banner();
     }
@@ -475,7 +501,7 @@ public final class ConsoleTab extends Tab {
                 return true;
             }
             if (cmd.equals("kill-server") || cmd.equals("start-server")) {
-                post("Pas de serveur adb sur la tablette : ADB Pilot parle directement aux appareils.", "info");
+                post("Pas de serveur adb sur " + Ui.self() + " : ADB Pilot parle directement aux appareils.", "info");
                 return true;
             }
             if (cmd.equals("pair") || cmd.equals("mdns")) return err("débogage sans fil (appairage) non pris en charge dans cette version");
@@ -522,7 +548,7 @@ public final class ConsoleTab extends Tab {
                     if (a.get(i).startsWith("-")) flags.add(a.get(i));
                     else files.add(local(a.get(i)));
                 }
-                for (File f : files) if (!f.isFile()) return err("fichier introuvable sur la tablette : " + f);
+                for (File f : files) if (!f.isFile()) return err("fichier introuvable sur " + Ui.self() + " : " + f);
                 if (files.isEmpty()) return err("usage : adb install [-r] [-g] [-d] FICHIER.apk");
                 AdbDevice.Result r = files.size() == 1 && !files.get(0).getName().toLowerCase().endsWith(".apk")
                         ? Core.installFile(d, files.get(0), null, null) : d.install(files, flags, null);
@@ -531,7 +557,7 @@ public final class ConsoleTab extends Tab {
             if (cmd.equals("push")) {
                 if (a.size() < 3) return err("usage : adb push LOCAL DISTANT");
                 File f = local(a.get(1));
-                if (!f.isFile()) return err("fichier introuvable sur la tablette : " + f);
+                if (!f.isFile()) return err("fichier introuvable sur " + Ui.self() + " : " + f);
                 String rem = a.get(2);
                 if (rem.endsWith("/")) rem += f.getName();
                 d.push(f, rem, null);
@@ -784,7 +810,7 @@ public final class ConsoleTab extends Tab {
                 fb.command(sb.toString(), o);
             } else if (c0.equals("flash") && a.size() > 2) {
                 File f = local(a.get(2));
-                if (!f.isFile()) return err("fichier introuvable sur la tablette : " + f);
+                if (!f.isFile()) return err("fichier introuvable sur " + Ui.self() + " : " + f);
                 post("Sending '" + a.get(1) + "' (" + (f.length() / 1024) + " KB)", "out");
                 FileInputStream in = new FileInputStream(f);
                 try {

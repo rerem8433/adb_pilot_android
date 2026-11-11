@@ -1,8 +1,8 @@
 # ADB Pilot pour Android
 
-**Gestionnaire d'appareils Android via ADB, depuis une tablette Android — sans PC, sans root.**
+**Gestionnaire d'appareils Android via ADB, depuis une tablette ou un smartphone Android — sans PC, sans root.**
 
-ADB Pilot pour Android permet de gérer une box Android TV ou un téléphone depuis une tablette, en **Wi-Fi** ou en **USB OTG** :
+ADB Pilot pour Android permet de gérer une box Android TV, un téléphone ou une tablette **depuis un autre appareil Android** (tablette ou smartphone), en **Wi-Fi** ou en **USB OTG** :
 - lister les applications avec leurs noms, icônes et versions ;
 - désactiver ou désinstaller le bloatware ;
 - installer des APK / XAPK / APKS / APKM ;
@@ -11,7 +11,14 @@ ADB Pilot pour Android permet de gérer une box Android TV ou un téléphone dep
 - piloter l'écran avec scrcpy ;
 - ouvrir une console adb / fastboot.
 
-C'est la version tablette d'**[ADB Pilot](https://github.com/rerem8433/adb_pilot)** (Linux, Windows, macOS), avec la même interface.
+C'est la version Android d'**[ADB Pilot](https://github.com/rerem8433/adb_pilot)** (Linux, Windows, macOS), avec la même interface.
+
+> ⚠️ **À savoir avant d'installer : ADB Pilot ne sert PAS à nettoyer le téléphone ou la tablette sur lequel il est installé.**
+> Comme la version PC, il pilote **un autre appareil** auquel il se connecte (box, TV, téléphone…), en Wi-Fi ou par câble OTG.
+> Ton téléphone ou ta tablette joue le rôle du PC : c'est la « télécommande », pas la cible.
+>
+> C'est l'inverse de l'application Android d'ADB AppControl, qui sert à gérer l'appareil sur lequel elle est installée.
+> Pour débloater ton propre téléphone, utilise ADB Pilot sur un PC ou sur un autre appareil Android.
 
 Développé par **ParadoxXx Squad** — [github.com/rerem8433/adb_pilot_android](https://github.com/rerem8433/adb_pilot_android)
 
@@ -66,15 +73,23 @@ Cette version n'est **pas un portage** de l'application PC : elle est **réécri
 
 **Applications** : liste avec noms, icônes, versions et tailles, panneau d'actions et assistant debloat.
 
-![Onglet Applications](screenshots/Applications.jpeg)
+![Onglet Applications](screenshots/Applications.png)
+
+**Assistant debloat** : choix du niveau de nettoyage.
+
+![Assistant debloat](screenshots/Debloat.png)
+
+**Installer** : bibliothèque d'APK et état sur l'appareil.
+
+![Page Installer](screenshots/Installer.png)
 
 **Store** : installation en un clic.
 
-![Onglet Store](screenshots/Store.jpeg)
+![Onglet Store](screenshots/Store.png)
 
 **Outils** : fiche de l'appareil, télécommande et scrcpy.
 
-![Onglet Outils](screenshots/Tools.jpeg)
+![Onglet Outils](screenshots/Outils.png)
 
 **scrcpy** : l'écran de la box sur la tablette.
 
@@ -82,11 +97,11 @@ Cette version n'est **pas un portage** de l'application PC : elle est **réécri
 
 **Processus** : applications en cours et RAM.
 
-![Onglet Processus](screenshots/Processus.jpeg)
+![Onglet Processus](screenshots/Processus.png)
 
 **Console** : adb / fastboot, shell, logcat.
 
-![Onglet Console](screenshots/Console.jpeg)
+![Onglet Console](screenshots/Console.png)
 
 ## Compatibilité
 
@@ -95,7 +110,7 @@ Cette version n'est **pas un portage** de l'application PC : elle est **réécri
 | Système | Statut |
 |---|---|
 | Android 5.0 et plus récent, tablette 8" / 10" (paysage) | 🧪 Test — validé sur Lenovo Tab M10 FHD (Android 11) |
-| Téléphone | ⚠️ Fonctionne, mais l'interface est pensée pour un écran de tablette |
+| Smartphone (écran de moins de 600 dp, en portrait ; scrcpy bascule en paysage) | 🧪 Test — disposition dédiée depuis la 0.3.0 (Paramètres → Disposition pour la forcer) |
 | USB OTG | ✅ Si la tablette gère l'USB hôte (câble OTG) |
 
 **Appareils pilotés** : toute box Android TV, téléphone ou tablette avec le débogage ADB activé (Amlogic, Rockchip, Allwinner, MediaTek, Qualcomm…). Pour le son dans scrcpy, l'appareil doit être en Android 11 ou plus.
@@ -191,9 +206,9 @@ Copyright © 2026 ParadoxXx Squad
 
 # ADB Pilot for Android — English
 
-**Android device manager over ADB, from an Android tablet — no PC, no root.**
+**Android device manager over ADB, from an Android tablet or phone — no PC, no root.**
 
-ADB Pilot for Android lets you manage an Android TV box or a phone from a tablet, over **Wi-Fi** or **USB OTG**:
+ADB Pilot for Android lets you manage an Android TV box, a phone or a tablet **from another Android device** (tablet or phone), over **Wi-Fi** or **USB OTG**:
 - list apps with their names, icons and versions;
 - disable or uninstall bloatware;
 - install APK / XAPK / APKS / APKM files;
@@ -202,7 +217,14 @@ ADB Pilot for Android lets you manage an Android TV box or a phone from a tablet
 - control the screen with scrcpy;
 - open an adb / fastboot console.
 
-It is the tablet edition of **[ADB Pilot](https://github.com/rerem8433/adb_pilot)** (Linux, Windows, macOS), with the same interface.
+It is the Android edition of **[ADB Pilot](https://github.com/rerem8433/adb_pilot)** (Linux, Windows, macOS), with the same interface.
+
+> ⚠️ **Before you install: ADB Pilot is NOT meant to debloat the phone or tablet it is installed on.**
+> Like the PC edition, it manages **another device** it connects to (box, TV, phone…), over Wi-Fi or an OTG cable.
+> Your phone or tablet plays the role of the PC: it is the "remote control", not the target.
+>
+> This is the opposite of ADB AppControl's Android app, which manages the device it is installed on.
+> To debloat your own phone, use ADB Pilot on a PC or on another Android device.
 
 Developed by **ParadoxXx Squad** — [github.com/rerem8433/adb_pilot_android](https://github.com/rerem8433/adb_pilot_android)
 
@@ -262,7 +284,7 @@ See the [French section](#captures-décran) above.
 | System | Status |
 |---|---|
 | Android 5.0 or newer, 8" / 10" tablet (landscape) | 🧪 Test — validated on Lenovo Tab M10 FHD (Android 11) |
-| Phone | ⚠️ Works, but the UI is designed for a tablet screen |
+| Phone (screen under 600 dp, portrait; scrcpy switches to landscape) | 🧪 Test — dedicated layout since 0.3.0 (Settings → Layout to force it) |
 | USB OTG | ✅ If the tablet supports USB host (OTG cable) |
 
 **Managed devices**: any Android TV box, phone or tablet with ADB debugging enabled (Amlogic, Rockchip, Allwinner, MediaTek, Qualcomm…). For audio in scrcpy, the device must run Android 11 or later.

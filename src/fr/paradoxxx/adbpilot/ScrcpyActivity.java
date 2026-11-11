@@ -9,6 +9,7 @@ import android.media.AudioTrack;
 import android.media.MediaCodec;
 import android.media.MediaFormat;
 import android.media.MediaMuxer;
+import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.InputType;
@@ -99,6 +100,8 @@ public final class ScrcpyActivity extends Activity implements SurfaceHolder.Call
         Config.init(this);
         Ui.init(this);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON | WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        // Smartphone : paysage d'emblée (box / TV), ajusté ensuite à la taille réelle de l'image
+        if (Ui.phone) setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         ctl = Controller.instance;
         if (ctl == null || !ctl.ready()) {
             finish();
@@ -351,6 +354,9 @@ public final class ScrcpyActivity extends Activity implements SurfaceHolder.Call
     private void relayout() {
         runOnUiThread(new Runnable() {
             public void run() {
+                // Smartphone : l'écran suit l'orientation de l'appareil affiché (box/TV → paysage)
+                if (Ui.phone && frameW > 0 && frameH > 0) setRequestedOrientation(frameW >= frameH
+                        ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
                 fit.requestLayout();
             }
         });
